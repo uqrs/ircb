@@ -28,33 +28,58 @@ BEGIN {
 #
 # command: store a tell for someone
 #
-($1 ~ /^#/) && ($6 ~ /^:(t|tell)$/) {
-   if(!length($8)){send("PRIVMSG " $1 " :Usage: tell [recipient] [message]");next;}
+($2 == "PRIVMSG") && ($4 ~ /^::(t|tell)$/) {
+   if(!length($5)){send("PRIVMSG " $3 " :Usage: tell [recipient] [message]");next;}
 
    #
    # Construct the required message string:
    #
+   mtell_sender=user();
    mtell_date=sys("date +%s");
-   mtell_message=$0;sub(/^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +/,"",mtell_message);
+   mtell_message=cut($0,"6-");
    gsub("\x1E","",mtell_message);
-   printf("%s\x1E%s\x1E%s\x1E%s\n",$7,$5,mtell_date,mtell_message) >> mtell_persist;fflush();
+   printf("%s\x1E%s\x1E%s\x1E%s\n",$5,mtell_sender,mtell_date,mtell_message) >> mtell_persist;fflush();
 
    #
    # add the recipient's name to the cache if it's not already in there
    #
-   (mtell_cache !~ (" " $7 " ")) && (mtell_cache=(mtell_cache $7 " "));
+   (mtell_cache !~ (" " $5 " ")) && (mtell_cache=(mtell_cache $5 " "));
+
+   #
+   # print confirmation that the tell was queued
+   #
+   send(                                                                         \
+     sprintf(                                                                    \
+       "PRIVMSG %s :[%s => %s][@%s] Message of length (%s) queued successfully", \
+       $3,                                                                       \
+       mtell_sender,                                                             \
+       $5,                                                                       \
+       sys("date +%s"),                                                          \
+       sys(sprintf("wc -c <<< '%s'",san(mtell_message)))                         \
+     )                                                                           \
+   )
 }
 
 #
 # command: retrieve and send all pending messages for this user.
 #
-($1 ~ /^#/) && ($6 ~ /^:(showtells)$/) {
+($2 == "PRIVMSG") && ($4 ~ /^::(showtells)$/) {
+   #
+   # retrieve the user
+   #
+   mtell_user=user();
+
+   #
+   # remove the recipient's name from the cache
+   #
+   sub(" " mtell_user " "," ",mtell_cache);
+
    #
    # collect all the tells in array mtell_Tells;
    #
    arr(mtell_Tells);
-   lsys(                                          \
-     sprintf(mtell_RETRIEVE,$5),mtell_Tells       \
+   lsys(                                              \
+     sprintf(mtell_RETRIEVE,mtell_user),mtell_Tells   \
    );
 
    #
@@ -72,7 +97,7 @@ BEGIN {
      send(                                                      \
       sprintf(                                                  \
         "PRIVMSG %s :[%s => %s][%4dy %3dd %2dh %2dm ago] %s",   \
-        $5,                                                     \
+        mtell_user,                                             \
         mtell_Tellparts[2],                                     \
         mtell_Tellparts[1],                                     \
         mtell_yearssince,                                       \
@@ -90,24 +115,29 @@ BEGIN {
 #
 # retrieve the amount of pending messages for this person.
 #
-($1 ~ /^#/) && (mtell_cache ~ (" " $5 " ")) {
+($2 == "PRIVMSG") && (mtell_cache ~ (" " user() " ")) {
+   #
+   # get the user
+   #
+   mtell_user=user();
+
    #
    # remove the recipient's name from the cache
    #
-   sub(" " $5 " "," ",mtell_cache);
+   sub(" " mtell_user " "," ",mtell_cache);
 
    #
    # get the amount of pending tells
    #
    mtell_pending=sys(                        \
-     sprintf(mtell_PENDING,$5)               \
+     sprintf(mtell_PENDING,mtell_user)       \
    )
 
    #
    # inform them
    #
-   send(                                                                            \
-     sprintf("PRIVMSG %s :You have %d messages in your inbox.",$5,mtell_pending)    \
+   send(                                                                                    \
+     sprintf("PRIVMSG %s :You have %d messages in your inbox.",mtell_user,mtell_pending)    \
    )
 }
 
