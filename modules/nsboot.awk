@@ -3,20 +3,20 @@
 #
 BEGIN {
 ### set your nickserv password
-    nsboot_authcmd="PRIVMSG nickserv :identify NSPASSWORD_HERE"
+#   mnsboot_authcmd="PRIVMSG nickserv :identify ns_pass"
 ### uncomment and modify as needed
-#   nsboot_cmd[0]="JOIN #mychannel";
-#   nsboot_cmd[1]="PRIVMSG #mychannel :ircb v1.0";
+#   mnsboot_Cmd[0]="JOIN #mychannel";
+#   mnsboot_Cmd[1]="PRIVMSG #mychannel :ircb v1.0 // http://github.com/uqrs/ircb";
 }
 
 ## some ircds may not use end-of-motd, who knows. modify if necessary.
 $5 == "376" {
-    send(nsboot_authcmd);
+    send(mnsboot_authcmd);
 }
 
 ## change to suit your network's nickserv behaviour
 (tolower($1) == "nickserv") && (tolower($0) ~ /password accepted/) {
-  for (boot in nsboot_cmd) {send(nsboot_cmd[boot]);};
-    delete nsboot_cmd;
+    for (mnsboot_line in mnsboot_Cmd) {send(mnsboot_Cmd[mnsboot_line]);};
+    delete mnsboot_Cmd;
 }
 

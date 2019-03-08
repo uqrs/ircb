@@ -3,12 +3,12 @@
 #
 BEGIN {
 ### uncomment and modify as needed
-#   boot_cmd[0]="JOIN #mychannel";
-#   boot_cmd[1]="PRIVMSG #mychannel :ircb v1.0";
+#   mboot__Cmd[0]="JOIN #mychannel";
+#   mboot__Cmd[1]="PRIVMSG #mychannel :ircb v1.0";
 }
 
 ## some ircds may not use end-of-motd, who knows. modify if necessary.
 $5 == "376" {
-    for (boot in boot_cmd) {send(boot_cmd[boot]);};
-    delete boot_cmd;
+    for (mboot_line in mboot_Cmd) {send(mboot_Cmd[mboot_line]);};
+    delete mboot_Cmd;
 }
