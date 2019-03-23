@@ -40,7 +40,7 @@ BEGIN {
 }
 
 #
-# destroy all ctrl+f's or ctrl+m's.
+# destroy all ^Fs and ^J's.
 #
 {gsub(/[\r\n]+/,"")};
 
