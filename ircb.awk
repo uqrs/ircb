@@ -30,10 +30,10 @@
 # for help and support with irc, read: https://tools.ietf.org/html/rfc2812
 # for help and support with awk, read: awk(1)
 function send (mesg)                      {print (mesg "\r\n");fflush();}                                       # send message
-function sys  (call,     out)             {call | getline out;close(call);return out;}                          # system call wrapper
-function lsys (call,Out)                  {while ((call | getline Out)>0){Out[length(Out)+1]=Out};close(call);} # system call wrapper but it does multiple lines
+function sys  (call,     	out)      {call | getline out;close(call);return out;}                          # system call wrapper
+function lsys (call,Out,	out)      {while ((call | getline out)>0){Out[length(Out)+1]=out};close(call);} # system call wrapper but it does multiple lines
 function array(Arr)                       {split("",Arr);}                                                      # create new array
-function san  (string,   out)             {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
+function san  (string,  	 out)     {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
 #
 # function: retrieve fields x to y
 #
