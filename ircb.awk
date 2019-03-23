@@ -32,7 +32,7 @@ function sys  (call,     out)             {call | getline out;close(call);return
 function lsys (call,Out)                  {while ((call | getline Out)>0){Out[length(Out)+1]=Out}close(call);}        # system call wrapper but it does multiple lines
 function array(Arr)                       {split("",Arr);}                                                                # create new array
 function san  (string,   out)             {out=string;gsub(/'/,"'\\''",out);return out} #"                                   # sanitise string for use in system calls
-function user (string)                    {string || (string=$0);match(string,/^:([^!]+)!/);return substr(string,2,RLENGTH-2);} # return the nickname of a message's sender
+function user (string)                    {string || (string=$0);} # return the nickname of a message's sender
 
 #
 # retrieve fields x to y
@@ -66,6 +66,11 @@ BEGIN {
 {gsub(/[\r\n]+/,"")};
 
 #
+# store the recipient in a different, globally-accessible variable
+#
+{match($1,/^:([^!]+)!/);USER=substr($1,2,RLENGTH-2);}
+
+#
 # respond to pings normally
 #
 $1 == "PING" {
@@ -76,6 +81,5 @@ $1 == "PING" {
 # if a user is DMing us, spoof the channel form our own nick to the users' nick
 #
 ($3 == ircb_nick) && ($2 == "PRIVMSG") {
-    $3=user();
+    $3=USER;
 }
-
