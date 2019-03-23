@@ -15,6 +15,8 @@
 #  - for local variables, functions must be used. local variables must be declared by introducing a two-tab gap inbetween
 #    intended arguments and the local variables. the variable's name must begin with a capital letter if it's an array.
 #  - global variables for use by modules must be preceded with the module's name (e.g. `boot_commands` for the `boot.awk` module)
+#  - a distinction is made between 'top-level functions' and 'normal functions'
+#     * top-level functions are capitalised, and are called by a regular awk statement (e.g. `boot_Nickserv`)
 #  - check for function conflicts with grep. you're smart,  you can figure it out
 #  - comments starting with '##' indicate the presence of ircd-weirdness, where you might need to modify some code.
 #  - comments starting with '###' indicate there are config variables nearby that need to be changed
@@ -27,18 +29,29 @@
 #
 # for help and support with irc, read: https://tools.ietf.org/html/rfc2812
 # for help and support with awk, read: awk(1)
-function send (mesg)                      {print (mesg "\r\n");fflush();}                                      # send message
-function sys  (call,     out)             {call | getline out;close(call);return out;}                             # system call wrapper
-function lsys (call,Out)                  {while ((call | getline Out)>0){Out[length(Out)+1]=Out}close(call);}        # system call wrapper but it does multiple lines
-function array(Arr)                       {split("",Arr);}                                                                # create new array
-function san  (string,   out)             {out=string;gsub(/'/,"'\\''",out);return out} #"                                   # sanitise string for use in system calls
-function user (string)                    {string || (string=$0);} # return the nickname of a message's sender
-
+function send (mesg)                      {print (mesg "\r\n");fflush();}                                       # send message
+function sys  (call,     out)             {call | getline out;close(call);return out;}                          # system call wrapper
+function lsys (call,Out)                  {while ((call | getline Out)>0){Out[length(Out)+1]=Out};close(call);} # system call wrapper but it does multiple lines
+function array(Arr)                       {split("",Arr);}                                                      # create new array
+function san  (string,   out)             {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
+function user (string)                    {string || (string=$0);}                                              # return the nickname of a message's sender
 #
-# retrieve fields x to y
+# function: retrieve fields x to y
 #
 function cut (string,begin,end,        out,Arr) {
     split(string,Arr);
+    (end != 0) || (end=length(Arr));
+
+    for (begin;begin<=end;begin++){
+        out=(out Arr[begin] FS);
+    };
+
+    return out;
+}
+#
+# function: same as `cut` but accept an already-split array.
+#
+function acut(Arr,begin,end,		out) {
     (end != 0) || (end=length(Arr));
 
     for (begin;begin<=end;begin++){
