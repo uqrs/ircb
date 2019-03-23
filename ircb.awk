@@ -22,13 +22,13 @@
 # faq:
 # Q: "i want to change the command prefixes for my modules (from ":" to "!")
 # A: sed -Ei 's_^\$4\s*~\s*/\^:._\$4 ~ /^:' modules/*
-function send(fsend_mesg)                     {print (fsend_mesg "\r\n");fflush();}
-function sys (fsys_call)                      {fsys_call | getline fsys_out;close(fsys_call);return fsys_out;}
-function lsys(fsys_call,fsys_Out)             {while ((fsys_call | getline fsys_out)>0){fsys_Out[length(fsys_Out)+1]=fsys_out}close(fsys_call);}
-function arr (farr_arr)                       {split("",farr_arr);}
-function san (fsan_string)                    {fsan_out=fsan_string;gsub(/'/,"'\\''",fsan_out);return fsan_out} #"
-function cut (fcut_str,fcut_fields,fcut_delim){fcut_delim || (fcut_delim=" ");return sys(sprintf("cut -f '%s' -d '%s' <<< '%s'",san(fcut_fields),san(fcut_delim),san(fcut_str)))}
-function user(fuser_str)                      {fuser_str || (fuser_str=$0);match(fuser_str,/^:([^!]+)!/);return substr(fuser_str,2,RLENGTH-2);}
+function send (mesg)                      {print (mesg "\r\n");fflush();}
+function sys  (call,     out)             {call | getline out;close(call);return out;}
+function lsys (call,Out)                  {while ((call | getline Out)>0){Out[length(Out)+1]=Out}close(call);}
+function array(arr)                       {split("",arr);}
+function san  (string,   out)             {out=string;gsub(/'/,"'\\''",out);return out} #"
+#function cut (string,fields,delimeter)   {fcut_delim || (fcut_delim=" ");return sys(sprintf("cut -f '%s' -d '%s' <<< '%s'",san(fcut_fields),san(fcut_delim),san(fcut_str)))}
+function user (string)                    {string || (string=$0);match(string,/^:([^!]+)!/);return substr(string,2,RLENGTH-2);}
 
 BEGIN {
     ircb_nick="ircb";
