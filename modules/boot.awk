@@ -7,7 +7,7 @@
 #
 # if cfg/boot_nspass exists, authenticate with nickserv on joining
 #
-function boot_nickserv(		pass,success){
+function boot_Nickserv(		pass,success){
     success=0;
     if ((getline pass < "cfg/boot_nspass")>0) {
         ## modify nickserv authentication command if needed.
@@ -21,15 +21,14 @@ function boot_nickserv(		pass,success){
 #
 # execute list of commands found in cfg/boot_commands
 #
-function boot_commands(		command){
+function boot_Commands(		command){
     while ((getline command < "cfg/boot_commands")>0) { 
         send(command);
     }; close("cfg/boot_commands");
 }
 
 ## some ircds may not use end-of-motd, who knows. modify if necessary.
-($2 == "376")                                               {boot_nickserv() || boot_commands()}
-
+($2 == "376")                                               {boot_Nickserv() || boot_Commands()}
 ## some nickserv instances may use a different string; modify if necessary.
-($1 ~ /^:NickServ!/) && (tolower($0) ~ /password accepted/) {boot_commands()}
+($1 ~ /^:NickServ!/) && (tolower($0) ~ /password accepted/) {boot_Commands()}
 
