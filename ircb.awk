@@ -34,7 +34,6 @@ function sys  (call,     out)             {call | getline out;close(call);return
 function lsys (call,Out)                  {while ((call | getline Out)>0){Out[length(Out)+1]=Out};close(call);} # system call wrapper but it does multiple lines
 function array(Arr)                       {split("",Arr);}                                                      # create new array
 function san  (string,   out)             {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
-function user (string)                    {string || (string=$0);}                                              # return the nickname of a message's sender
 #
 # function: retrieve fields x to y
 #
