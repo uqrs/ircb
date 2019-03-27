@@ -69,15 +69,15 @@ function tell_Add(		message){
    #
    # print confirmation that the tell was queued
    #
-   send(                                                                         \
-     sprintf(                                                                    \
-       "PRIVMSG %s :[%s => %s][@%s] Message of length (%s) queued successfully", \
-       $3,                                                                       \
-       USER,                                                                     \
-       $5,                                                                       \
-       sys("date +%s"),                                                          \
-       length(message)                                                           \
-     )                                                                           \
+   send(                                                                               \
+     sprintf(                                                                          \
+       "PRIVMSG %s :[tell][%s => %s][@%s] Message of length (%s) queued successfully", \
+       $3,                                                                             \
+       USER,                                                                           \
+       $5,                                                                             \
+       sys("date +%s"),                                                                \
+       length(message)                                                                 \
+     )                                                                                 \
    )
 
    #

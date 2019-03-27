@@ -95,3 +95,19 @@ $1 == "PING" {
 ($3 == ircb_nick) && ($2 == "PRIVMSG") {
     $3=USER;
 }
+
+#
+# create a loopback circuit: anything ircb sends to itself
+#
+(USER == ircb_nick) && ($2 == "PRIVMSG") {
+	$0=substr(cut($0,4),2);
+	# recalculate the USER variable
+	match($1,/^:([^!]+)!/);
+	USER=substr($1,2,RLENGTH-2);
+}
+#
+# handle us changing our own nick
+#
+(USER == ircb_nick) && ($2 == "NICK") {
+	ircb_nick=substr($3,2);
+}
