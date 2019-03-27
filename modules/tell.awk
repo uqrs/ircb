@@ -1,5 +1,6 @@
 ###
 # memoserv clone for networks that dont have memoserv
+# OPTIONALLY requires whois-sec.awk
 #
 BEGIN {
   ### the file in which tells should be permanently stored
@@ -8,6 +9,11 @@ BEGIN {
   # messages are stored in this file using:
   #   [recipient] [sender] [date] [message]\n
   #
+
+  #
+  # use whois-sec to identify recipients and senders?
+  #
+  tell_secure="yes";
 
   #
   # generate a cache table that stores the amount of messages each individual has queued
@@ -138,14 +144,25 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
 # command: store a tell for someone
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::(t|tell)$/) {
-   if(!length($5)){send("PRIVMSG " $3 " :Usage: tell [recipient] [message]");}
-   else           {tell_Add();}
+   if (!length($5)){
+	   send("PRIVMSG " $3 " :Usage: tell [recipient] [message]");
+   } else if (tell_secure=="yes"){
+        if ( whois_Whois(USER,$0,"tell-send",$3,"(tell_secure=yes)") == 0 ) {
+		tell_Add();
+	}
+   } else {tell_Add();}
 }
 
 # # #
 # command: retrieve and send all pending messages for this user.
 #
-($2 == "PRIVMSG") && ($4 ~ /^::(showtells)$/) {tell_Get()};
+($2 == "PRIVMSG") && ($4 ~ /^::(showtells)$/) {
+	if (tell_secure=="yes"){
+		if ( whois_Whois(USER,$0,"tell-get",$3,"(tell_secure=yes)") == 0 ) {
+			tell_Get();
+		}
+	} else { tell_Get(); }
+};
 # # #
 # retrieve the amount of pending messages for this person.
 #
@@ -153,8 +170,8 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
    #
    # inform them
    #
-   send(                                                                                    \
-     sprintf("PRIVMSG %s :You have %d messages in your inbox.",USER,tell_Cache[USER])       \
+   send(                                                                                           \
+     sprintf("PRIVMSG %s :[tell] You have %d messages in your inbox.",USER,tell_Cache[USER])       \
    )
 
    #

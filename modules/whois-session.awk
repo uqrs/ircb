@@ -1,5 +1,5 @@
 #
-# DEPENDS ON: whois.awk
+# DEPENDS ON: whois-sec.awk
 #
 # user session management tools.
 #

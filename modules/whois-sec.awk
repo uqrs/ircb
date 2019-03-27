@@ -16,13 +16,14 @@ BEGIN {
 	array(whois_Call);
 	array(whois_Cont);
 	array(whois_Envi);
+	array(whois_Extr);
 }
 
 #
 # top-level function; "is the user identified?"
-# needs: username (USER), command ($0) and context (channel name)
+# needs: username (USER), command ($0), context (module name), environment (channel) and extra (extra info);
 #
-function whois_Whois(who,command,context,environment){
+function whois_Whois(who,command,context,environment,extra){
 	# we identify users case-insensitively
 	who=tolower(who);
 
@@ -41,6 +42,7 @@ function whois_Whois(who,command,context,environment){
 		whois_Call[who]=command;
 		whois_Cont[who]=context;
 		whois_Envi[who]=environment;
+		whois_Extr[who]=extra;
 
 		# execute WHOIS command:
 		send("WHOIS " who);
@@ -80,11 +82,12 @@ function whois_verify(who) {
 		send("PRIVMSG " ircb_nick " :" whois_Call[who]);
 	} else {
 		# the user wasn't identified. send a 'sorry bruv' message
-		send("PRIVMSG " whois_Envi[who] " :[" whois_Cont[who] " => whois-sec] fatal: user '" $4 "' has not authenticated with services.");
+		send("PRIVMSG " whois_Envi[who] " :[" whois_Cont[who] " => whois-sec] fatal: user '" $4 "' has not authenticated with services " whois_Extr[who]);
 	}
 	delete whois_Envi[who];
 	delete whois_Cont[who];
 	delete whois_Call[who];
+	delete whois_Extr[who];
 }
 
 #
