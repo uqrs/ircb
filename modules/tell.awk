@@ -40,9 +40,9 @@ function tell_cache(user){
 function tell_initcache(		user,Arr){
    array(Arr);
 
-   lsys(                                             \
+   lsys(                                                               \
      sprintf("cut -d ' ' -f 1 <'%s' | sort | uniq",san(tell_persist)), \
-     Arr                                             \
+     Arr                                                               \
    )
 
    for (user in Arr) {
@@ -100,6 +100,11 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
    # remove the recipient's name from the cache
    #
    tell_clearcache(USER);
+
+   #
+   # clear our array
+   #
+   array(Tells);
 
    #
    # collect all tells queued for this user into array Tells;
