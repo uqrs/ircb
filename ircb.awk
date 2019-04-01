@@ -34,6 +34,7 @@ function sys  (call,     	out)      {call | getline out;close(call);return out;}
 function lsys (call,Out,	out)      {while ((call | getline out)>0){Out[length(Out)+1]=out};close(call);} # system call wrapper but it does multiple lines
 function array(Arr)                       {split("",Arr);}                                                      # create new array
 function san  (string,  	 out)     {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
+function rsan (string,           out)     {out=string;gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/,"\\\\&",out);return out}
 #
 # function: retrieve fields x to y
 #
