@@ -1,6 +1,9 @@
 ###
 # 'database' manager; used to let users store information on certain topics
 #
+# THIS IS THE `ED`-DEPENDENT VERSION; it has mild performance advantages while removing the file-I/O overhead.
+#                                     for the non-ed version, use the standard `db.awk`
+#
 # Channels may be bound to database files. One file has entries stored as:
 #
 # [entryname]\x1E[permissions]\x1E[owner]\x1E[editedby]\x1E[creationdate]\x1E[lastedited]\x1E[contents]\n
@@ -74,8 +77,7 @@ function db_Dissect(line,Arr){
 # returns a '1' if no matches were found. '0' otherwise.
 #
 function db_Search(db,field,search,mode,Matches,		Parts,line,count){
-	array(Parts);
-
+	array(Parts);array(Matches);
 	#
 	# if mode is `0`, perform a regular full-word search.
 	#
@@ -84,7 +86,7 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 			count++;
 			db_Dissect(l,Parts);
 
-			if (Parts[field] ~ (" " rsan(search))) {Matches[length(Matches)+1]=count;}
+			if (Parts[field] ~ (" " rsan(search) " ")) {Matches[length(Matches)+1]=count;}
 		}
 	#
 	# otherwise, perform a regex search
@@ -92,6 +94,7 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 	} else {
 		while ((getline l < db_Persist[db]) > 0) {
 			count++;
+			db_Dissect(l,Parts);
 
 			if (Parts[field] ~ search) {Matches[length(Matches)+1]=count;}
 		}
@@ -116,57 +119,31 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 # Aside from these two parameters, db_Update() will also update the edit date.
 # This function does not add new entries, it only updates existing ones.
 #
-function db_Update(db,line,user,new,		Parts,l,count,date,tempfile){
+function db_Update(db,line,user,new,		Parts,l,date,tempfile){
 	array(Parts);
 	date=sys("date +%s");
-	tempfile=("/tmp/ircb-db-" rand()*1000000);
 
-	#
-	# keep reading lines from the database file, copying them over to a temporary file
-	# when we hit our target line `line`, we modify it.
-	#
-	while ((getline l < db_Persist[db]) > 0) {
-		#
-		# we've hit our match. modify it.
-		#
-		if (++count==line){
-			db_Dissect(l,Parts);
+	l=db_Get(db,line);
+	if ( l == "" ) { return 1 };
+	db_Dissect(l,Parts);
 
-			#
-			# assemble a new line:
-			#
-			l=sprintf(						\
-				"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E %s ",	\
-				Parts[1],					\
-				Parts[2],					\
-				Parts[3],					\
-				user    ,					\
-				Parts[5],					\
-				date    ,					\
-				new						\
-			)
-		}
-		#
-		# write our new line to the temporary file.
-		#
-		print l >> tempfile;
-	}
-	close(db_Persist[db]);
-	close(tempfile);
-	#
-	# finally, move our file over to the database location:
-	#
-	sys(                                            \
-	    sprintf(                                    \
-			"mv '%s' '%s' 2>/dev/null",	\
-			tempfile,			\
-			db_Persist[db]			\
-		)					\
+	sys(												\
+		sprintf(										\
+			"echo '%d\nc\n%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E %s \n.\nw\nQ' | ed - '%s'",	\
+			line,										\
+			Parts[1],									\
+			Parts[2],									\
+			Parts[3],									\
+			san(user),									\
+			Parts[5],									\
+			date,										\
+			san(new),									\
+			db_Persist[db]									\
+		)											\
 	)
 
 	return 0;
 }
-
 #
 # db_Add will allocate a new entry into the database file.
 # It accepts a few arguments:
