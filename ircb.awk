@@ -12,16 +12,44 @@
 #  - irc logger: /bin/tee
 #
 # rules:
-#  - for local variables, functions must be used. local variables must be declared by introducing a two-tab gap inbetween
-#    intended arguments and the local variables. the variable's name must begin with a capital letter if it's an array.
-#  - global variables for use by modules must be preceded with the module's name (e.g. `boot_commands` for the `boot.awk` module)
+#  - for local variables, functions must be used. local variables must be
+#    declared by introducing a two-tab gap inbetween intended arguments and the
+#    local variables. the variable's name must begin with a capital letter if 
+#    it's an array.
+#
+#  - global variables for use by modules must be preceded with the module's
+#    name (e.g. `boot_commands` for the `boot.awk` module)
 #  - a distinction is made between 'top-level functions' and 'normal functions'
-#     * top-level functions are capitalised, and are called by a regular awk statement (e.g. `boot_Nickserv`)
+#     * top-level functions are capitalised, and are called by a regular awk
+#       statement (e.g. `boot_Nickserv`)
 #  - check for function conflicts with grep. you're smart,  you can figure it out
-#  - comments starting with '##' indicate the presence of ircd-weirdness, where you might need to modify some code.
-#  - comments starting with '###' indicate there are config variables nearby that need to be changed
-#    hint: `grep -r '###' modules/`
+#  - comments starting with '##' indicate the presence of ircd-weirdness, 
+#    where you might need to modify some code.
+#  - comments starting with '###' indicate there are config variables nearby
+#    that need to be changed
+#     * hint: `grep -r '###' modules/`
 #  - no gnuisms (call me out on github if i put any in)
+#
+# for user-facing IRC output, use the following grammar:
+#	[CONTEXT] WHAT: MESSAGE [ADDITIONS]
+#
+#	CONTEXT is a description of the general stack of calls performed.
+#	        e.g. say the `db` module is making a `sync` operation, CONTEXT would 
+#               indicate: [db => sync]. these may chain infinitely, so if `sync`
+#               is calling `whois-sec`, CONTEXT would indicate
+#               [db => sync => whois-sec], etc.
+#
+#	WHAT is an optional, short description of the operations' status.
+#            is may, for example, say `warn`, `fatal`, `success`, etc.
+#
+#       MESSAGE is the meat of the information for the user. go wild.
+#
+#       ADDITIONS is extra information.
+#                 QUOTING SHELL OUTPUT: `[2> this is stderr stuff]`
+#                 INDICATING IRCB BEHAVIOUR: `(some_option=yes/no)`
+#
+# this grammar needn't be adhered to strictly, but it provides a good starting
+# point for cohesiveness between modules.
 #
 # faq:
 # Q: "i want to change the command prefixes for my modules (from ":" to "!")

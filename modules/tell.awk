@@ -150,9 +150,9 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::(t|tell)$/) {
    if (!length($5)){
-	   send("PRIVMSG " $3 " :Usage: tell [recipient] [message]");
+	   send("PRIVMSG " $3 " :[tell] Usage: tell [recipient] [message]");
    } else if (tell_secure=="yes"){
-        if ( whois_Whois(USER,$0,"tell-send",$3,"(tell_secure=yes)") == 0 ) {
+        if ( whois_Whois(USER,$0,"tell => send",$3,"(tell_secure=yes)") == 0 ) {
 		tell_Add();
 	}
    } else {tell_Add();}
@@ -163,7 +163,7 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::(showtells)$/) {
 	if (tell_secure=="yes"){
-		if ( whois_Whois(USER,$0,"tell-get",$3,"(tell_secure=yes)") == 0 ) {
+		if ( whois_Whois(USER,$0,"tell => get",$3,"(tell_secure=yes)") == 0 ) {
 			tell_Get();
 		}
 	} else { tell_Get(); }
