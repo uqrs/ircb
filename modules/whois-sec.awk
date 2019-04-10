@@ -7,7 +7,7 @@ BEGIN {
 	whoisec_mode="r";
 
 	# Default session length?
-	whois_sessionlength=300;
+	whoisec_sessionlength=300;
 
 	# whois database for caching
 	array(whois_Db);
@@ -29,7 +29,7 @@ function whois_Whois(who,command,context,environment,extra){
 
 	# if the user is indeed identified for this nickname
 	if ( whois_validsession(who) == 0 ) {
-		whois_Db[who]=int(sys("date +%s"))+whois_sessionlength;
+		whois_Db[who]=int(sys("date +%s"))+whoisec_sessionlength;
 		# return a '0' to show that the user is identified.
 		return 0;
 	} else {
@@ -107,7 +107,7 @@ function whois_expire(who) {
 ($2 == "307") {
 	# the user who is identified is stored in `$4`	
 	# given the fact that a user has just been identified; we're renewing their session
-	whois_Db[tolower($4)]=(int(sys("date +%s")) + whois_sessionlength);
+	whois_Db[tolower($4)]=(int(sys("date +%s")) + whoisec_sessionlength);
 }
 
 # 
