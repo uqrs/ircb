@@ -72,7 +72,7 @@ function db_Dissect(line,Arr){
 # db_Search will scour a database for a line where field `field` has value `value`
 # it populates the given array `Matches` with line numbers.
 #
-# `mode` may be 0 for a regular word-search, or 1 for a regex search.
+# `mode` may be 0 for a regular word-search, 2 for exact matching, or 1 for a regex search.
 #
 # returns a '1' if no matches were found. '0' otherwise.
 #
@@ -87,6 +87,17 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 			db_Dissect(l,Parts);
 
 			if (Parts[field] ~ (rsan(search))) {Matches[length(Matches)+1]=count;}
+		}
+	} else
+	#
+	# if mode is `2`, perform an exact match.
+	#
+	if ( mode == 2 ) {
+		while ((getline l < db_Persist[db]) > 0){
+			count++;
+			db_Dissect(l,Parts);
+
+			if (Parts[field] == (rsan(search))) {Matches[length(Matches)+1]=count;}
 		}
 	#
 	# otherwise, perform a regex search
