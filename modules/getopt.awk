@@ -60,7 +60,9 @@ function getopt_Getopt(options,optstring,Fill,		getopt_out,Parse,i,current_opt,c
 		#
 		# take care of trailing spaces.
 		#
-		for ( i in Parse ) {sub(/ $/,"",Parse[i])};
+		for ( i in Fill ) {
+			gsub(/ $/,"",Fill[i]);
+		}
 
 		return 0;
 	}
