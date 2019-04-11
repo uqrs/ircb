@@ -77,14 +77,13 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 	array(Parts);
 
 	#
-	# if mode is `0`, perform a regular full-word search.
+	# if mode is `0`, perform a regular search.
 	#
 	if ( mode == 0 ) {
 		while ((getline l < db_Persist[db]) > 0){
 			count++;
 			db_Dissect(l,Parts);
-
-			if (Parts[field] ~ (" " rsan(search))) {Matches[length(Matches)+1]=count;}
+			if (Parts[field] ~ (rsan(search))) {Matches[length(Matches)+1]=count;}
 		}
 	#
 	# otherwise, perform a regex search
