@@ -82,7 +82,7 @@ function modesec_Nick(	A) {
 }
 
 #
-#
+# delete all entries for a user if they quit irc.
 #
 function modesec_Quit() {
 	for ( i in modesec_Lookup ) {

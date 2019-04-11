@@ -4,7 +4,9 @@
 # user session management tools.
 #
 function whois_Session() {
+	#
 	# add other session-management tools here...
+	#
 	whois_session_show()
 }
 
@@ -19,9 +21,6 @@ function whois_session_show(		who,who_p,expires_in){
 	}
 };
 
-#
-# top-level command
-#
 ($2 == "PRIVMSG") && ($4 ~ /^:(@S|:session)/) {
 	whois_Session();
 }

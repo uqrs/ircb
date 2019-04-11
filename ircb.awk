@@ -62,7 +62,7 @@ function sys  (call,     	out)      {call | getline out;close(call);return out;}
 function lsys (call,Out,	out)      {while ((call | getline out)>0){Out[length(Out)+1]=out};close(call);} # system call wrapper but it does multiple lines
 function array(Arr)                       {split("",Arr);}                                                      # create new array
 function san  (string,  	 out)     {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
-function rsan (string,           out)     {out=string;gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/,"\\\\&",out);return out}
+function rsan (string,           out)     {out=string;gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/,"\\\\&",out);return out}  # ditto, but sanitise regex
 #
 # function: retrieve fields x to y
 #
@@ -107,26 +107,27 @@ BEGIN {
 {gsub(/[\r\n]+/,"")};
 
 #
-# store the recipient in a different, globally-accessible variable
+# USER = nick of the user who sent the command
 #
 {match($1,/^:([^!]+)!/);USER=substr($1,2,RLENGTH-2);}
 
 #
-# respond to pings normally
+# ping
 #
 $1 == "PING" {
     send("PONG " substr($2,2));
 }
 
 #
-# if a user is DMing us, spoof the channel form our own nick to the users' nick
+# if a user is DMing us, spoof the channel from our own nick to the users' nick
+# this ensures that `$3` can always be used as a target channel.
 #
 ($3 == ircb_nick) && ($2 == "PRIVMSG") {
     $3=USER;
 }
 
 #
-# create a loopback circuit: anything ircb sends to itself
+# create a loopback circuit: PRIVMSG's received by `ircb` are interpreted as commands.
 #
 (USER == ircb_nick) && ($2 == "PRIVMSG") {
 	$0=substr(cut($0,4),2);

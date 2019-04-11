@@ -31,13 +31,13 @@ BEGIN {
 	# databases are flat files that store actual information.
 	#
 
-	#db_Persist["remember"]="./data/db/remember-db";
+	db_Persist["remember"]="./data/db/remember-db";
 
 	#
 	# `db_Use` specifies which database a given channel should use.
 	#
 
-	#db_Use["#example"]="remember";
+	db_Use["#cat-n"]="remember";
 
 	#
 	# `dbinterface_Authority` specifies which the "authority" channel for a database.
@@ -45,7 +45,7 @@ BEGIN {
 	# as ~, &, @, %, + etc. are looked up.
 	#
 
-	#db_Authority["remember"]="#example";
+	db_Authority["remember"]="#cat-n";
 
 	#
 	# message/response templates
@@ -260,7 +260,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 					return 3;
 				}
 				#
-				# no more conflicts. We're done, boys.
+				# no more conflicts. 
 				#
 				if (Options[0] == "-w")      { dbinterface_Sync_write(Options)  }
 				else if (Options[0] == "-a") { dbinterface_Sync_append(Options) }

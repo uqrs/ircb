@@ -1,4 +1,4 @@
-###
+#
 # memoserv clone for networks that dont have memoserv
 # OPTIONALLY requires whois-sec.awk
 #
@@ -27,15 +27,15 @@ BEGIN {
   tell_initcache();
 }
 
-###
-# function: add a user to the cache
+#
+# add a user to the cache
 #
 function tell_cache(user){
    tell_Cache[user]=sys(sprintf("awk '$1 == \"%s\"' < '%s' | wc -l",user,tell_persist));
 }
 
-###
-# function: initialise cache for all users
+#
+# initialise cache for all users
 #
 function tell_initcache(		user,Arr){
    array(Arr);
@@ -50,21 +50,17 @@ function tell_initcache(		user,Arr){
    }
 }
 
-###
-# function: clear a user from the cache
+#
+# clear a user from the cache
 #
 function tell_clearcache(user){
    delete tell_Cache[user];
 }
 
-###!!
-# Function: add a tell to the cache
-#    invoked by: `tell`
-###
+#
+# add a tell to the cache
+#
 function tell_Add(		message){
-   # 
-   # variable initialisation
-   #
    message=cut($0,6);
 
    #
@@ -86,24 +82,14 @@ function tell_Add(		message){
      )                                                                                 \
    )
 
-   #
-   # add the user to the cache
-   #
    tell_cache($5);
 }
 
-###!!
-# Function: send all tells queued for a user.
-#    invoked by: `showtells`
+#
+# send all tells queued for a user.
+#
 function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
-   #
-   # remove the recipient's name from the cache
-   #
    tell_clearcache(USER);
-
-   #
-   # clear our array
-   #
    array(Tells);
 
    #
@@ -145,8 +131,8 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
    };
 }
 
-# # #
-# command: store a tell for someone
+#
+# store a tell for someone
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::(t|tell)$/) {
    if (!length($5)){
@@ -158,8 +144,8 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
    } else {tell_Add();}
 }
 
-# # #
-# command: retrieve and send all pending messages for this user.
+#
+# retrieve and send all pending messages for this user.
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::(showtells)$/) {
 	if (tell_secure=="yes"){
@@ -168,20 +154,14 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
 		}
 	} else { tell_Get(); }
 };
-# # #
+#
 # retrieve the amount of pending messages for this person.
 #
 ($2 == "PRIVMSG") && (USER in tell_Cache) {
-   #
-   # inform them
-   #
    send(                                                                                           \
      sprintf("PRIVMSG %s :[tell] You have %d messages in your inbox.",USER,tell_Cache[USER])       \
    )
 
-   #
-   # remove the recipient's entry from the cache
-   #
    tell_clearcache(USER);
 }
 

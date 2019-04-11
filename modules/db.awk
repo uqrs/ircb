@@ -40,9 +40,6 @@ BEGIN {
 # be dissected and inserted into Arr
 #
 function db_Get(db,line,		c,l){
-	#
-	# retrieve line # 'line' from the database file
-	#
 	while ((getline l < db_Persist[db]) > 0) {
 		if (++c==line){close(db_Persist[db]);return l}
 	}
@@ -163,7 +160,7 @@ function db_Update(db,line,user,new,		Parts,l,count,date,tempfile){
 	close(db_Persist[db]);
 	close(tempfile);
 	#
-	# finally, move our file over to the database location:
+	# finally, overwrite the old database.
 	#
 	sys(                                            \
 	    sprintf(                                    \

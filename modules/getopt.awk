@@ -6,9 +6,6 @@
 #   `Fill` as the table to which the parsed arguments should be stored.
 #
 function getopt_Getopt(options,optstring,Fill,		getopt_out,Parse,i,current_opt,current_arg) {
-	#
-	# generate and execute a system call.
-	#
 	getopt_out=sys(							\
 		sprintf(						\
 			"getopt -u -o '%s' -- $(echo '%s') 2>&1",	\
@@ -23,7 +20,7 @@ function getopt_Getopt(options,optstring,Fill,		getopt_out,Parse,i,current_opt,c
 	#
 	if (getopt_out !~ /^ /) {
 		#
-		# an error occurred, likely an invalid flag.
+		# an error occurred, invalid flag.
 		#
 		Fill[0]=getopt_out;
 		return 1;
@@ -69,10 +66,6 @@ function getopt_Getopt(options,optstring,Fill,		getopt_out,Parse,i,current_opt,c
 }
 
 #
-# complex getopt-based flag checking
-#
-
-#
 # scour through Options, checking to make sure only one flag specified in `which` is present.
 # `which` is just `QRS` for ensuring only one of -Q, -R or -S is supplied.
 #
@@ -102,8 +95,11 @@ function getopt_Either(Options,which,		found) {
 			else {found=i};
 		}
 	}
-	if (found) {Options[0]=found;return 0;} # return 0 if one was found
-	else {return 1;}       # return 1 if none were found
+	#
+	# exit code
+	#
+	if (found) {Options[0]=found;return 0;} 
+	else       {return 1;}
 }
 
 #
