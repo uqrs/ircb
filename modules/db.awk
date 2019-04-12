@@ -142,7 +142,7 @@ function db_Update(db,line,user,new,		Parts,l,count,date,tempfile){
 			# assemble a new line:
 			#
 			l=sprintf(						\
-				"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E %s ",	\
+				"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
 				Parts[1],					\
 				Parts[2],					\
 				Parts[3],					\
@@ -186,7 +186,7 @@ function db_Add(db,entry,owner,contents){
 	date=sys("date +%s");
 
 	# TODO: add arg for standard permissions to be written into
-	printf("%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E %s \n",	\
+	printf("%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\n",	\
 	     entry,						\
 	     "rwrwrw",						\
 	     owner,						\
