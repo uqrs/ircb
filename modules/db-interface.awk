@@ -10,8 +10,11 @@
 #       -s [f]  perform a database-search for field 'f'. 'f' may be one of
 #               'name', 'owner', 'edited_by', 'creation', 'last_edited'.
 #
+#	-p [n]  show result page 'n'
 #       -r [n]  return result 'n'
+#
 #       -E      use extended regular expressions when searching.
+#	-F      use fixed strings when searching (default).
 #
 #       -i [n]  print information on entry `n`
 #     DATABASE CONTENT MODIFICATION
@@ -50,16 +53,20 @@ BEGIN {
 	#
 	# message/response templates
 	#
-	dbinterface_Template["err_opts"]   ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
-	dbinterface_Template["conflict"]   ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
-	dbinterface_Template["neither"]    ="PRIVMSG %s :[%s] fatal: one of %s is required.";
-	dbinterface_Template["neither_c"]  ="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
-	dbinterface_Template["invalid"]    ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
-	dbinterface_Template["no-entry"]   ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
-	dbinterface_Template["not-found"]  ="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
-	dbinterface_Template["no-db"]      ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
-	dbinterface_Template["result-info"]="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s; Last modified by: \x0F%s\x02 -- Created at: \x0F%s\x02; Last modified at: \x0F%s\x02 -- Permissions: %s;"
-	dbinterface_Template["result-show"]="PRIVMSG %s :[%s] %s %s";
+	dbinterface_Template["err_opts"]      ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
+	dbinterface_Template["conflict"]      ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
+	dbinterface_Template["neither"]       ="PRIVMSG %s :[%s] fatal: one of %s is required.";
+	dbinterface_Template["neither_c"]     ="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
+	dbinterface_Template["invalid"]       ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
+	dbinterface_Template["no-entry"]      ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
+	dbinterface_Template["not-found"]     ="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
+	dbinterface_Template["no-db"]         ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
+	dbinterface_Template["result-info"]   ="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s; Last modified by: \x0F%s\x02 -- Created at: \x0F%s\x02; Last modified at: \x0F%s\x02 -- Permissions: %s;"
+	dbinterface_Template["result-show"]   ="PRIVMSG %s :[%s] %s %s";
+	dbinterface_Template["no-number"]     ="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
+	dbinterface_Template["no-query"]      ="PRIVMSG %s :[%s] fatal: no search query specified.";
+	dbinterface_Template["no-matches"]    ="PRIVMSG %s :[%s] fatal: no results for query '%s'.";
+	dbinterface_Template["search-results"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
 }
 
 #
@@ -88,7 +95,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt("-QSrEiIwapsOTcC",argstring,Options);
+	success=getopt_Getopt("-QSrFEiIwapsOTcC",argstring,Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -108,6 +115,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	#
 	} else {
 		success=getopt_Either(Options,"QS");
+
 		if (success==1) {
 			#
 			# neither option was found
@@ -147,7 +155,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# filter/blacklist out operations that do not apply to `-Q`
 				#
-				success=getopt_Uncompatible(Options,"wapOTcC");
+				success=getopt_Uncompatible(Options,"waOTcC");
 				if (success==1) {
 					#
 					# incompatible options found; complain
@@ -205,7 +213,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# filter/blacklist out operations that do not apply to `-S`
 				#
-				success=getopt_Uncompatible(Options,"rEi");
+				success=getopt_Uncompatible(Options,"rEFi");
 				if (success==1) {
 					#
 					# incompatible options found; complain
@@ -262,7 +270,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# no more conflicts. 
 				#
-				if (Options[0] == "-w")      { dbinterface_Sync_write(Options)  }
+				if      (Options[0] == "-w") { dbinterface_Sync_write(Options)  }
 				else if (Options[0] == "-a") { dbinterface_Sync_append(Options) }
 				else if (Options[0] == "-s") { dbinterface_Sync_sed(Options)    }
 				else if (Options[0] == "-p") { dbinterface_Sync_prepend(Options)}
@@ -271,7 +279,6 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	}
 }
 
-function dbinterface_Query_search(Options){send("PRIVMSG " $3 " :invoked `dbinterface_Query_search()`");}
 
 #
 # db_info retrieves information on a given database entry, and then displays it.
@@ -329,7 +336,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 			sprintf(					\
 				dbinterface_Template["result-info"],	\
 				$3,					\
-				"db => query",				\
+				"db => query-info",			\
 				Parts[1],				\
 				db,					\
 				Parts[3],				\
@@ -392,6 +399,157 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
 			Parts[7]					\
 		)							\
 	)
+}
+
+function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts,db,page,maxpage,out) {
+	if ((Options["--"]=="") && (Options["-s"]=="")) {
+		send(							\
+			sprintf(					\
+				dbinterface_Template["no-query"],	\
+				$3,					\
+				"db => query-search"			\
+			)						\
+		)
+
+		return 1;
+	}
+
+	# TODO: fix this. it's hacky garbage and WRONG. See TODO
+	if (Options["-s"]) {searchfor=Options["-s"] " " Options["--"]}
+	else               {searchfor=Options["--"]}
+	sub(/ $/,"",searchfor);
+
+	#
+	# see if we have either `-E` or `-F`
+	#
+	success=getopt_Either(Options,"EF");
+
+	if (success==2) {
+		#
+		# both flags were specified, complain.
+		#
+		send(							\
+			sprintf(					\
+				dbinterface_Template["conflict"],	\
+				$3,					\
+				"db => query-search",			\
+				"-E",					\
+				"-F"					\
+			)						\
+		)
+
+		return 2;	
+	}
+
+	if (Options[0] == "-E") {mode=1}
+	else                    {mode=0};
+
+	success=getopt_Either(Options,"pr");
+
+	if (success==2) {
+		#
+		# both flags were specified, complain.
+		#
+		send(							\
+			sprintf(					\
+				dbinterface_Template["conflict"],	\
+				$3,					\
+				"db => query-search",			\
+				"-p",					\
+				"-r"					\
+			)						\
+		)
+
+		return 3;
+	} else if (success==1) {
+		Options["-p"]=1;
+		Options[0]="-p";
+	}
+
+	if (Options[Options[0]]=="") {
+		#
+		# no argument for page-result was specified. Complain.
+		#
+		send(							\
+			sprintf(					\
+				dbinterface_Template["no-number"],	\
+				$3,					\
+				"db => query-search",			\
+				Options[0]				\
+			)						\
+		)
+
+		return 4;
+	}
+
+	#
+	# arguments figured out. Begin searching
+	#
+	array(Results);
+	db=db_Use[$3];
+	success=db_Search(db,7,searchfor,mode,Results);
+
+	if (success==1) {
+		#
+		# no results found. complain.
+		#
+		send(							\
+			sprintf(					\
+				dbinterface_Template["no-matches"],	\
+				$3,					\
+				"db => query-search",			\
+				searchfor				\
+			)						\
+		)
+
+		return 5;
+	}
+
+	if (Options[0]=="-p") {
+		#
+		# `-p` specified; show pages with results
+		#
+		page=int(Options["-p"]);
+		maxpage=(((length(Results) - (length(Results)%10))/10)+1)
+
+
+ 		if ( page > maxpage ) {
+			#
+			# if the page number is higher than the amount of options we have,
+			# then just set `page` to the highest possible number.
+			#
+			page=maxpage;
+		}
+
+		#
+		# assemble our output string.
+		#
+		for (i = ((page-1)*10)+1 ; i<= (page*10) ; i++ ) {
+			success=db_Get(db,Results[i]);
+			if (success!=1) {
+				out=out cut(success,1,1,"\x1E",", ");
+			}
+		}
+
+		sub(/, $/,"",out)
+		send(							\
+			sprintf(					\
+				dbinterface_Template["search-results"],	\
+				$3,					\
+				"db => query-search",			\
+				page,					\
+				maxpage,				\
+				out					\
+			)						\
+		)
+	} else {
+		#
+		# `-r` specified; show result number `n`.
+		#
+		send("PRIVMSG " $3 " :uhhh, stuff about showed results go here.");
+	}
+
+	#send("PRIVMSG " $3 " :invoked `dbinterface_Query_search()` and mode=" mode " + Options[0]=" Options[0] " with arg " Options[Options[0]]);
 }
 
 function dbinterface_Sync_write(Options)  {send("PRIVMSG " $3 " :invoked `dbinterface_Sync_write()`");}
