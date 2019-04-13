@@ -53,6 +53,7 @@ function db_Get(db,line,		c,l){
 	# if 'l' was not returned, then that means no line was found. 
 	#
 	close(db_Persist[db]);
+	return 1;
 }
 
 #
