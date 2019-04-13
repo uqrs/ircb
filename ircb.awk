@@ -66,12 +66,14 @@ function rsan (string,           out)     {out=string;gsub(/[\$\^\\\.\[\]\{\}\*\
 #
 # function: retrieve fields x to y
 #
-function cut (string,begin,end,        out,Arr) {
-    split(string,Arr);
-    (end != 0) || (end=length(Arr));
+function cut (string,begin,end,sep,fmt_sep,        out,Arr) {
+    (sep != "")    || (sep=FS);
+    (fmt_sep != "")|| (fmt_sep=sep);
+    split(string,Arr,sep);
+    (end != 0)     || (end=length(Arr));
 
     for (begin;begin<=end;begin++){
-        out=(out Arr[begin] FS);
+        out=(out Arr[begin] fmt_sep);
     };
 
     return out;
@@ -79,11 +81,13 @@ function cut (string,begin,end,        out,Arr) {
 #
 # function: same as `cut` but accept an already-split array.
 #
-function acut(Arr,begin,end,		out) {
-    (end != 0) || (end=length(Arr));
+function acut(Arr,begin,end,sep,fmt_sep,	out) {
+    (end != 0)     || (end=length(Arr));
+    (sep != "")    || (sep=FS);
+    (fmt_sep != "")|| (fmt_sep=sep);
 
     for (begin;begin<=end;begin++){
-        out=(out Arr[begin] FS);
+        out=(out Arr[begin] fmt_sep);
     };
 
     return out;
