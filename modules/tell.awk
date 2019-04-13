@@ -135,7 +135,7 @@ function tell_Get(		tell,Tells,Parts,ys,ds,hs,ms,ss){
 # store a tell for someone
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::(t|tell)$/) {
-   if (!length($5)){
+   if (!length($6)){
 	   send("PRIVMSG " $3 " :[tell] Usage: tell [recipient] [message]");
    } else if (tell_secure=="yes"){
         if ( whois_Whois(USER,$0,"tell => send",$3,"(tell_secure=yes)") == 0 ) {
