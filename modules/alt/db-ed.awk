@@ -29,13 +29,13 @@ BEGIN {
   #
   # reference table for fields by name
   #
-  db_Field["entryname"]   =1;
-  db_Field["permissions"] =2;
-  db_Field["owner"]       =3;
-  db_Field["editedby"]    =4;
-  db_Field["creationdate"]=5;
-  db_Field["lastedited"]  =6;
-  db_Field["contents"]    =7;
+  db_Field["label"]    =1;
+  db_Field["perms"]    =2;
+  db_Field["owner"]    =3;
+  db_Field["edited_by"]=4;
+  db_Field["created"]  =5;
+  db_Field["modified"] =6;
+  db_Field["contents"] =7;
 }
 
 #
@@ -87,7 +87,7 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 			count++;
 			db_Dissect(l,Parts);
 
-			if (Parts[field] ~ (rsan(search))) {Matches[length(Matches)+1]=count;}
+			if (tolower(Parts[field]) ~ tolower(rsan(search))) {Matches[length(Matches)+1]=count;}
 		}
 	} else
 	#
@@ -98,7 +98,7 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 			count++;
 			db_Dissect(l,Parts);
 
-			if (Parts[field] == (rsan(search))) {Matches[length(Matches)+1]=count;}
+			if (tolower(Parts[field]) == tolower(search)) {Matches[length(Matches)+1]=count;}
 		}
 	#
 	# otherwise, perform a regex search
@@ -108,7 +108,7 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 			count++;
 			db_Dissect(l,Parts);
 
-			if (Parts[field] ~ search) {Matches[length(Matches)+1]=count;}
+			if (tolower(Parts[field]) ~ tolower(search)) {Matches[length(Matches)+1]=count;}
 		}
 	}
 
