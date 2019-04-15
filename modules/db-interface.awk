@@ -13,6 +13,8 @@
 #	-p [n]  show result page 'n'
 #       -r [n]  return result 'n'
 #
+#	-f [f]  search based on field 'f'
+#
 #       -E      use extended regular expressions when searching.
 #	-F      use fixed strings when searching (default).
 #
@@ -33,14 +35,17 @@ BEGIN {
 	#
 	# databases are flat files that store actual information.
 	#
-
 	db_Persist["remember"]="./data/db/remember-db";
 
 	#
 	# `db_Use` specifies which database a given channel should use.
 	#
-
 	db_Use["#cat-n"]="remember";
+
+	#
+	# dbinterface_color specifies whether output is formatted using colours.
+	#
+	dbinterface_color=1;
 
 	#
 	# `dbinterface_Authority` specifies which the "authority" channel for a database.
@@ -53,20 +58,22 @@ BEGIN {
 	#
 	# message/response templates
 	#
-	dbinterface_Template["err_opts"]      ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
-	dbinterface_Template["conflict"]      ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
-	dbinterface_Template["neither"]       ="PRIVMSG %s :[%s] fatal: one of %s is required.";
-	dbinterface_Template["neither_c"]     ="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
-	dbinterface_Template["invalid"]       ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
-	dbinterface_Template["no-entry"]      ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
-	dbinterface_Template["not-found"]     ="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
-	dbinterface_Template["no-db"]         ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
-	dbinterface_Template["result-info"]   ="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s; Last modified by: \x0F%s\x02 -- Created at: \x0F%s\x02; Last modified at: \x0F%s\x02 -- Permissions: %s;"
-	dbinterface_Template["result-show"]   ="PRIVMSG %s :[%s] %s %s";
-	dbinterface_Template["no-number"]     ="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
-	dbinterface_Template["no-query"]      ="PRIVMSG %s :[%s] fatal: no search query specified.";
-	dbinterface_Template["no-matches"]    ="PRIVMSG %s :[%s] fatal: no results for query '%s'.";
+	dbinterface_Template["err_opts"] ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
+	dbinterface_Template["conflict"] ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
+	dbinterface_Template["neither"]  ="PRIVMSG %s :[%s] fatal: one of %s is required.";
+	dbinterface_Template["neither_c"]="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
+	dbinterface_Template["invalid"]  ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
+	dbinterface_Template["no-entry"] ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
+	dbinterface_Template["not-found"]="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
+	dbinterface_Template["no-db"]    ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
+	dbinterface_Template["result-info"]	="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s; Last modified by: \x0F%s\x02 -- Created at: \x0F%s\x02; Last modified at: \x0F%s\x02 -- Permissions: %s;"
+	dbinterface_Template["result-show"]="PRIVMSG %s :[%s] %s %s";
+	dbinterface_Template["search-result-show"]="PRIVMSG %s :[%s][%d/%d] %s %s";
+	dbinterface_Template["no-number"]="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
+	dbinterface_Template["no-query"] ="PRIVMSG %s :[%s] fatal: no search query specified.";
+	dbinterface_Template["no-matches"]="PRIVMSG %s :[%s] fatal: no results for query '%s'.";
 	dbinterface_Template["search-results"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
+	dbinterface_Template["invalid-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
 }
 
 #
@@ -95,7 +102,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt("-QSrFEiIwapsOTcC",argstring,Options);
+	success=getopt_Getopt("-QSrfFEiIwapsOTcC",argstring,Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -213,7 +220,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# filter/blacklist out operations that do not apply to `-S`
 				#
-				success=getopt_Uncompatible(Options,"rEFi");
+				success=getopt_Uncompatible(Options,"rEFif");
 				if (success==1) {
 					#
 					# incompatible options found; complain
@@ -305,7 +312,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	if (Options["--"]) {searchfor=Options["--"]}
 	else               {searchfor=Options["-i"]}
 	db=db_Use[$3];
-	success=db_Search(db,db_Field["entryname"],searchfor,2,Results);
+	success=db_Search(db,db_Field["label"],searchfor,2,Results);
 
 	#
 	# if success isn't `0`, then no results were found.
@@ -369,7 +376,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
 	else               {searchfor=Options["-Q"]}
 	array(Results);
 	db=db_Use[$3];
-	success=db_Search(db,db_Field["entryname"],searchfor,2,Results);
+	success=db_Search(db,db_Field["label"],searchfor,2,Results);
 
 	if (success==1) {
 		send(							\
@@ -401,7 +408,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
 	)
 }
 
-function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts,db,page,maxpage,out) {
+function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts,db,page,maxpage,out,line,use_field) {
 	if ((Options["--"]=="") && (Options["-s"]=="")) {
 		send(							\
 			sprintf(					\
@@ -482,12 +489,29 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 		return 4;
 	}
 
+	if ("-f" in Options) {
+		if (!(Options["-f"] in db_Field)) {
+			send(							\
+				sprintf(					\
+					dbinterface_Template["invalid-field"],	\
+					$3,					\
+					"db => query-search"			\
+				)						\
+			)
+
+			return 5;
+		} 
+	} else {
+		Options["-f"]="contents";
+	}
+
 	#
 	# arguments figured out. Begin searching
 	#
 	array(Results);
 	db=db_Use[$3];
-	success=db_Search(db,7,searchfor,mode,Results);
+	use_field=db_Field[Options["-f"]];
+	success=db_Search(db,use_field,searchfor,mode,Results);
 
 	if (success==1) {
 		#
@@ -546,7 +570,57 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 		#
 		# `-r` specified; show result number `n`.
 		#
-		send("PRIVMSG " $3 " :uhhh, stuff about showed results go here.");
+		result=int(Options["-r"]);
+
+		if ( result > length(Results) ) {
+			#
+			# if the result number if higher than the amount of results
+			# found, then just set `result` to the highest possible result.
+			#
+			result=length(Results);
+		}
+
+		#
+		# assemble our output string
+		#
+		line=db_Get(db,Results[result]);
+		db_Dissect(line,Parts);
+
+		#
+		# add colour-coding/formatting to which part of the string was matched.
+		# recycle our previous `mode` variable:
+		#
+		if (dbinterface_color == 1) {
+			if (mode==0) {
+				match(Parts[use_field],rsan(searchfor))
+			} else if (mode==1) {
+				match(Parts[use_field],searchfor)
+			} else {
+				RSTART=1; RLENGTH=length(Parts[use_field]);
+			}
+			Parts[use_field]=sprintf(			\
+				"%s%s%s%d%s%s%s",			\
+				substr(Parts[use_field],1,RSTART-1),	\
+				"\x02",					\
+				"\x03",					\
+				4,					\
+				substr(Parts[use_field],RSTART,RLENGTH),\
+				"\x0f",					\
+				substr(Parts[use_field],RSTART+RLENGTH) \
+			);
+		}
+
+		send(								\
+			sprintf(						\
+				dbinterface_Template["search-result-show"],	\
+				$3,						\
+				"db => query-show",				\
+				result,						\
+				length(Results),				\
+				Parts[1],					\
+				Parts[7]					\
+			)							\
+		)
 	}
 
 	#send("PRIVMSG " $3 " :invoked `dbinterface_Query_search()` and mode=" mode " + Options[0]=" Options[0] " with arg " Options[Options[0]]);
@@ -563,8 +637,8 @@ function dbinterface_Sync_prepend(Options){send("PRIVMSG " $3 " :invoked `dbinte
 #            db_Search(db,field,search,mode,Matches)		[1=none found]
 #            db_Update(db,line,user,new)			[1=line doesn't exist]
 #            db_Add(db,entry,owner,contents) 
-# db_Field["entryname", "permissions", "owner", "editedby", "creationdate", "lastedited", "contents"];
-#           1            2              3        4           5               6             7
+# db_Field["label", "perms", "owner", "edited_by", "created", "edited", "contents"];
+#           1        2        3        4            5          6         7
 #
 ($2 == "PRIVMSG") && ($4 ~ /^::db$/) {
 	dbinterface_Db($0);
