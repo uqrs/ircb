@@ -66,7 +66,7 @@ BEGIN {
 	dbinterface_Template["no-entry"] ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
 	dbinterface_Template["not-found"]="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
 	dbinterface_Template["no-db"]    ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
-	dbinterface_Template["result-info"]	="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s; Last modified by: \x0F%s\x02 -- Created at: \x0F%s\x02; Last modified at: \x0F%s\x02 -- Permissions: %s;"
+	dbinterface_Template["result-info"]	="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s\x02; Last modified by: \x0F%s\x02 -- Created at: \x0F%s; \x02Last modified at: \x0F%s\x02 -- Permissions: \x0F%s;"
 	dbinterface_Template["result-show"]="PRIVMSG %s :[%s] %s %s";
 	dbinterface_Template["search-result-show"]="PRIVMSG %s :[%s][%d/%d] %s %s";
 	dbinterface_Template["no-number"]="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
@@ -599,11 +599,11 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 				RSTART=1; RLENGTH=length(Parts[use_field]);
 			}
 			Parts[use_field]=sprintf(			\
-				"%s%s%s%d%s%s%s",			\
+				"%s%s%d%s%s%s%s",			\
 				substr(Parts[use_field],1,RSTART-1),	\
-				"\x02",					\
 				"\x03",					\
 				4,					\
+				"\x02",					\
 				substr(Parts[use_field],RSTART,RLENGTH),\
 				"\x0f",					\
 				substr(Parts[use_field],RSTART+RLENGTH) \
