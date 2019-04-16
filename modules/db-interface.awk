@@ -4,11 +4,10 @@
 # REQUIRES either db.awk or alt/db-ed.awk
 #
 # FLAGS (GENERAL)
-#     -Q [n]  perform a database query (default: show entry `n`);
+#     -Q      perform a database query (default: show entry)
 #     -S      perform a database update
 #   DATABASE QUERY OPTIONS (use with -Q)
-#       -s [f]  perform a database-search for field 'f'. 'f' may be one of
-#               'name', 'owner', 'edited_by', 'creation', 'last_edited'.
+#       -s      perform a database-search.
 #
 #	-p [n]  show result page 'n'
 #       -r [n]  return result 'n'
@@ -18,18 +17,18 @@
 #       -E      use extended regular expressions when searching.
 #	-F      use fixed strings when searching (default).
 #
-#       -i [n]  print information on entry `n`
+#       -i        print information on entry
 #     DATABASE CONTENT MODIFICATION
-#       -w [n]    overwrite entry 'n'
-#       -a [n]    append to entry 'n'
-#       -p [n]    prepend to entry 'n'
-#       -s [n]    perform a find-and-replace on entry 'n'
+#       -w        overwrite entry
+#       -a        append to entry
+#       -p        prepend to entry
+#       -s        perform a find-and-replace on entry
 #     DATABASE CONTENT MODIFICATION EXTRA (use with -Sw, -Sa, -Sp, -Ss)
-#       -O [n]    overwrite database owner
-#       -T [n]    overwrite creation date
+#       -O        overwrite database owner
+#       -T        overwrite creation date
 #     DATABASE META MODIFICATION
-#       -c [n]    change permissions for entry `n`
-#       -C [n]    change ownership of entry `n`
+#       -c        change permissions for entry
+#       -C        change ownership of entry
 #
 BEGIN {
 	#
@@ -102,7 +101,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt("-QSrfFEiIwapsOTcC",argstring,Options);
+	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w,a,p:,s,O,T,c,C",Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -155,7 +154,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 			#
 			# continue regular execution
 			#
-			if (Options[0] == "-Q") {
+			if (Options[0] == "Q") {
 			###
 			# PERFORM A QUERY OPERATION (-Q)
 			###
@@ -211,7 +210,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# no more conflicts/bogus flags. We can begin command execution.
 				#
-				if (Options[0] == "-s") { dbinterface_Query_search(Options) }
+				if (Options[0] == "s")  { dbinterface_Query_search(Options) }
 				else                    { dbinterface_Query_info(Options)   };
 			} else {
 			###
@@ -277,10 +276,10 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# no more conflicts. 
 				#
-				if      (Options[0] == "-w") { dbinterface_Sync_write(Options)  }
-				else if (Options[0] == "-a") { dbinterface_Sync_append(Options) }
-				else if (Options[0] == "-s") { dbinterface_Sync_sed(Options)    }
-				else if (Options[0] == "-p") { dbinterface_Sync_prepend(Options)}
+				if      (Options[0] == "w") { dbinterface_Sync_write(Options)  }
+				else if (Options[0] == "a") { dbinterface_Sync_append(Options) }
+				else if (Options[0] == "s") { dbinterface_Sync_sed(Options)    }
+				else if (Options[0] == "p") { dbinterface_Sync_prepend(Options)}
 			}
 		}
 	}
@@ -290,11 +289,11 @@ function dbinterface_Db(input,		success,argstring,Options) {
 #
 # db_info retrieves information on a given database entry, and then displays it.
 #
-function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_at,modified_at,searchfor) {
+function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_at,modified_at) {
 	#
 	# ensure the user actually specified an argument
 	#
-	if ((Options["--"] == "") && (Options["-i"] == "")) {
+	if (Options["--"] == "") {
 		send(							\
 			sprintf(					\
 				dbinterface_Template["no-entry"],	\
@@ -309,10 +308,8 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	# perform the search
 	#
 	array(Results);
-	if (Options["--"]) {searchfor=Options["--"]}
-	else               {searchfor=Options["-i"]}
 	db=db_Use[$3];
-	success=db_Search(db,db_Field["label"],searchfor,2,Results);
+	success=db_Search(db,db_Field["label"],Options["--"],2,Results);
 
 	#
 	# if success isn't `0`, then no results were found.
@@ -323,7 +320,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 				dbinterface_Template["not-found"],	\
 				$3,					\
 				"db => query-info",			\
-				searchfor,				\
+				Options["--"],				\
 				db					\
 			)						\
 		)
@@ -357,8 +354,8 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	}
 }
 
-function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
-	if ((Options["--"]=="") && (Options["-Q"]=="")) {
+function dbinterface_Query_show(Options,	Parts,Results,line,success) {
+	if ((Options["--"]=="")) {
 		send(							\
 			sprintf(					\
 				dbinterface_Template["no-entry"],	\
@@ -372,11 +369,9 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
 	#
 	# perform a search for the given database entry
 	#
-	if (Options["--"]) {searchfor=Options["--"]}
-	else               {searchfor=Options["-Q"]}
 	array(Results);
 	db=db_Use[$3];
-	success=db_Search(db,db_Field["label"],searchfor,2,Results);
+	success=db_Search(db,db_Field["label"],Options["--"],2,Results);
 
 	if (success==1) {
 		send(							\
@@ -384,7 +379,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
 				dbinterface_Template["not-found"],	\
 				$3,					\
 				"db => query-show",			\
-				searchfor,				\
+				Optipns["--"],				\
 				db					\
 			)						\
 		)
@@ -408,8 +403,8 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success,searchfor) {
 	)
 }
 
-function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts,db,page,maxpage,out,line,use_field) {
-	if ((Options["--"]=="") && (Options["-s"]=="")) {
+function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,maxpage,out,line,use_field) {
+	if ((Options["--"]=="")) {
 		send(							\
 			sprintf(					\
 				dbinterface_Template["no-query"],	\
@@ -420,11 +415,6 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 
 		return 1;
 	}
-
-	# TODO: fix this. it's hacky garbage and WRONG. See TODO
-	if (Options["-s"]) {searchfor=Options["-s"] " " Options["--"]}
-	else               {searchfor=Options["--"]}
-	sub(/ $/,"",searchfor);
 
 	#
 	# see if we have either `-E` or `-F`
@@ -448,7 +438,7 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 		return 2;	
 	}
 
-	if (Options[0] == "-E") {mode=1}
+	if (Options[0] == "E")  {mode=1}
 	else                    {mode=0};
 
 	success=getopt_Either(Options,"pr");
@@ -469,8 +459,8 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 
 		return 3;
 	} else if (success==1) {
-		Options["-p"]=1;
-		Options[0]="-p";
+		Options["p"]=1;
+		Options[0]="p";
 	}
 
 	if (Options[Options[0]]=="") {
@@ -489,8 +479,8 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 		return 4;
 	}
 
-	if ("-f" in Options) {
-		if (!(Options["-f"] in db_Field)) {
+	if ("f" in Options) {
+		if (!(Options["f"] in db_Field)) {
 			send(							\
 				sprintf(					\
 					dbinterface_Template["invalid-field"],	\
@@ -502,7 +492,7 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 			return 5;
 		} 
 	} else {
-		Options["-f"]="contents";
+		Options["f"]="contents";
 	}
 
 	#
@@ -510,8 +500,8 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 	#
 	array(Results);
 	db=db_Use[$3];
-	use_field=db_Field[Options["-f"]];
-	success=db_Search(db,use_field,searchfor,mode,Results);
+	use_field=db_Field[Options["f"]];
+	success=db_Search(db,use_field,Options["--"],mode,Results);
 
 	if (success==1) {
 		#
@@ -522,18 +512,18 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 				dbinterface_Template["no-matches"],	\
 				$3,					\
 				"db => query-search",			\
-				searchfor				\
+				Options["--"]				\
 			)						\
 		)
 
 		return 5;
 	}
 
-	if (Options[0]=="-p") {
+	if (Options[0]=="p") {
 		#
 		# `-p` specified; show pages with results
 		#
-		page=int(Options["-p"]);
+		page=int(Options["p"]);
 		maxpage=(((length(Results) - (length(Results)%10))/10)+1)
 
 
@@ -570,7 +560,7 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 		#
 		# `-r` specified; show result number `n`.
 		#
-		result=int(Options["-r"]);
+		result=int(Options["r"]);
 
 		if ( result > length(Results) ) {
 			#
@@ -592,9 +582,9 @@ function dbinterface_Query_search(Options,		searchfor,success,mode,Results,Parts
 		#
 		if (dbinterface_color == 1) {
 			if (mode==0) {
-				match(Parts[use_field],rsan(searchfor))
+				match(Parts[use_field],rsan(Options["--"]))
 			} else if (mode==1) {
-				match(Parts[use_field],searchfor)
+				match(Parts[use_field],rsan(Options["--"]))
 			} else {
 				RSTART=1; RLENGTH=length(Parts[use_field]);
 			}
