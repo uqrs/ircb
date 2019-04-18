@@ -762,7 +762,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 			sprintf(					\
 				dbinterface_Template["write-success"],	\
 				$3,					\
-				"db => sync-write"	 		\
+				"db => sync-write",	 		\
 				Options[what],				\
 				USER,					\
 				USER,					\
