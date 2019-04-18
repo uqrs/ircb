@@ -3,6 +3,23 @@
 # these functions accept more advanced query/update interfacing, and return singular strings for use in user-facing output.
 # REQUIRES either db.awk or alt/db-ed.awk
 #
+# Database contents are stored as:
+# [entryname]\x1E[permissions]\x1E[owner]\x1E[editedby]\x1E[creationdate]\x1E[lastedited]\x1E[contents]\n
+# [entryname] is the name of the entry itself.
+# [permissions] is a string of 14 characters that stores read-write permissions for every irc-rank from none to ~
+#               the layout is:
+#                o   ~   &   @   %   +   n
+#               [rw][rw][rw][rw][rw][rw][rw]
+# where `o` denotes `owner`, and `n` denotes `none`.
+# note that not every module that uses databases requires this(!) It is just a feature that is essential for
+# certain modules that make use of `db.awk`
+#
+# [owner] is the nickname string of the individual who first allocated this entry
+# [editedby] is the nickname string of the individual who last modified this entry
+# [creationdate] is epoch describing when the entry was first allocated
+# [lastedited] is epoch describing when the entry was last modified
+# [contents] is a NL-terminated string of characters depicting the actual contents of this entry.
+#
 # FLAGS (GENERAL)
 #     -Q      perform a database query (default: show entry)
 #     -S      perform a database update
@@ -37,9 +54,9 @@ BEGIN {
 	db_Persist["remember"]="./data/db/remember-db";
 
 	#
-	# `db_Use` specifies which database a given channel should use.
+	# `dbinterface_Use` specifies which database a given channel should use.
 	#
-	db_Use["#cat-n"]="remember";
+	dbinterface_Use["#cat-n"]="remember";
 
 	#
 	# dbinterface_color specifies whether output is formatted using colours.
@@ -51,11 +68,23 @@ BEGIN {
 	# the database authority channel is the channel from which e user-modes such
 	# as ~, &, @, %, + etc. are looked up.
 	#
-
 	db_Authority["remember"]="#cat-n";
+	
+	#
+	# reference table for fields 
+	#
+	db_Field["label"]	=1;
+	db_Field["perms"]	=2;
+	db_Field["owner"]	=3;
+	db_Field["edited_by"]	=4;
+	db_Field["created"]	=5;
+	db_Field["modified"]	=6;
+	db_Field["contents"]	=7;
 
 	#
 	# message/response templates
+	#
+	# TODO: standardise the naming of these.
 	#
 	dbinterface_Template["err_opts"] ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
 	dbinterface_Template["conflict"] ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
@@ -73,6 +102,11 @@ BEGIN {
 	dbinterface_Template["no-matches"]="PRIVMSG %s :[%s] fatal: no results for query '%s'.";
 	dbinterface_Template["search-results"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
 	dbinterface_Template["invalid-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
+	dbinterface_Template["no-write"]="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
+	dbinterface_Template["no-write-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
+	dbinterface_Template["write-success"]="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
+	dbinterface_Template["update-success"]="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
+	dbinterface_Template["substitute-usage"]="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`"
 }
 
 #
@@ -83,7 +117,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	#
 	# make sure a database is allocated
 	#
-	if (!($3 in db_Use)) { 
+	if (!($3 in dbinterface_Use)) { 
 		send(						\
 			sprintf(				\
 				dbinterface_Template["no-db"],	\
@@ -101,7 +135,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w,a,p:,s,O,T,c,C",Options);
+	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s:,O,T,c,C",Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -276,10 +310,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# no more conflicts. 
 				#
-				if      (Options[0] == "w") { dbinterface_Sync_write(Options)  }
-				else if (Options[0] == "a") { dbinterface_Sync_append(Options) }
-				else if (Options[0] == "s") { dbinterface_Sync_sed(Options)    }
-				else if (Options[0] == "p") { dbinterface_Sync_prepend(Options)}
+				dbinterface_Sync_write(Options);
 			}
 		}
 	}
@@ -308,7 +339,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	# perform the search
 	#
 	array(Results);
-	db=db_Use[$3];
+	db=db_Persist[dbinterface_Use[$3]];
 	success=db_Search(db,db_Field["label"],Options["--"],2,Results);
 
 	#
@@ -321,7 +352,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 				$3,					\
 				"db => query-info",			\
 				Options["--"],				\
-				db					\
+				dbinterface_Use[$3]			\
 			)						\
 		)
 
@@ -342,7 +373,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 				$3,					\
 				"db => query-info",			\
 				Parts[1],				\
-				db,					\
+				dbinterface_Use[$3],			\
 				Parts[3],				\
 				Parts[4],				\
 				created_at,				\
@@ -370,7 +401,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	# perform a search for the given database entry
 	#
 	array(Results);
-	db=db_Use[$3];
+	db=db_Persist[dbinterface_Use[$3]];
 	success=db_Search(db,db_Field["label"],Options["--"],2,Results);
 
 	if (success==1) {
@@ -379,8 +410,8 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 				dbinterface_Template["not-found"],	\
 				$3,					\
 				"db => query-show",			\
-				Optipns["--"],				\
-				db					\
+				Options["--"],				\
+				dbinterface_Use[$3]			\
 			)						\
 		)
 		return 2;
@@ -499,7 +530,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 	# arguments figured out. Begin searching
 	#
 	array(Results);
-	db=db_Use[$3];
+	db=db_Persist[dbinterface_Use[$3]];
 	use_field=db_Field[Options["f"]];
 	success=db_Search(db,use_field,Options["--"],mode,Results);
 
@@ -612,24 +643,158 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 			)							\
 		)
 	}
-
-	#send("PRIVMSG " $3 " :invoked `dbinterface_Query_search()` and mode=" mode " + Options[0]=" Options[0] " with arg " Options[Options[0]]);
 }
 
-function dbinterface_Sync_write(Options)  {send("PRIVMSG " $3 " :invoked `dbinterface_Sync_write()`");}
-function dbinterface_Sync_append(Options) {send("PRIVMSG " $3 " :invoked `dbinterface_Sync_append()`");}
-function dbinterface_Sync_sed(Options)    {send("PRIVMSG " $3 " :invoked `dbinterface_Sync_sed()`");};
-function dbinterface_Sync_prepend(Options){send("PRIVMSG " $3 " :invoked `dbinterface_Sync_prepend()`");}
+function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,sep)  {
+	if      ("w" in Options) {what="w";op="write"}
+	else if ("a" in Options) {what="a";op="append"}
+	else if ("s" in Options) {what="s";op="substitute"}
+	else if ("p" in Options) {what="p";op="prepend"}
+
+	if ((Options[what]=="")) {
+		#
+		# no label specified to write to
+		#
+		send(							\
+			sprintf(					\
+			     dbinterface_Template["no-write-entry"],	\
+			     $3,					\
+			     "db => sync-" op				\
+			)						\
+		);
+
+		return 1;
+	}
+	if ((Options["--"] == "")) {
+		#
+		# no write content specified. Complain.
+		#
+		send(							\
+			sprintf(					\
+				dbinterface_Template["no-write"],	\
+				$3,					\
+				"db => sync-" op			\
+			)						\
+		)
+
+		return 2;
+	};
+
+	#
+	# attempt a search to see if an entry with this label already exists.
+	# call the appropriate function.
+	#
+	db=db_Persist[dbinterface_Use[$3]];
+	array(Current);
+	date=sys("date +%s");
+
+	success=dbinterface_Exists(db,Options[what],Current);
+
+	if (success==0) {
+		#
+		# entry exists. Update it.
+		#
+		old=db_Get(db,Current[1]);
+		db_Dissect(old,Parts);
+
+		Parts[db_Field["modified"]]=date;
+		Parts[db_Field["edited_by"]]=USER;
+
+		if      ( what == "w" ) {Parts[db_Field["contents"]]=Options["--"]}
+		else if ( what == "a" ) {Parts[db_Field["contents"]]=Parts[db_Field["contents"]] " " Options["--"]}
+		else if ( what == "p" ) {Parts[db_Field["contents"]]=Options["--"] " " Parts[db_Field["contents"]]}
+		else if ( what == "s" ) {
+			sub(/^ +/,"",Options["--"]);
+			sub(/ +$/,"",Options["--"]);
+
+			sep=substr(Options["--"],2,1);
+			split(Options["--"],Sub,sep);
+
+			if ( (Options["--"] !~ /^s./) || (length(Sub) != 4)) {
+				send(								\
+					sprintf(						\
+						dbinterface_Template["substitute-usage"],	\
+						$3,						\
+						"db => sync-update/" op				\
+					)							\
+				)
+				return 1;
+			}
+
+			gsub(Sub[2],Sub[3],Parts[db_Field["contents"]]);
+
+		}
+
+		gsub(/ +/," ",Parts[db_Field["contents"]]);
+		db_Update(db,Current[1],acut(Parts,1,7,"\x1E"));
+
+		send(							\
+			sprintf(					\
+				dbinterface_Template["update-success"],	\
+				$3,					\
+				"db => sync-update/" op,		\
+				Parts[db_Field["label"]],		\
+				Parts[db_Field["owner"]],		\
+				USER,					\
+				Parts[db_Field["perms"]],		\
+				date					\
+			)						\
+		)
+	} else {
+		#
+		# entry doesn't exist. Write a new one.
+		#
+		new=sprintf(						\
+			"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
+			Options[what],					\
+			"rwrwrw",					\
+			USER,						\
+			USER,						\
+			date,						\
+			date,						\
+			Options["--"]					\
+		)
+
+		# TODO: actually do something with `success`.
+		success=db_Add(db,new);
+
+		send(							\
+			sprintf(					\
+				dbinterface_Template["write-success"],	\
+				$3,					\
+				"db => sync-write"	 		\
+				Options[what],				\
+				USER,					\
+				USER,					\
+				"rwrwrw",				\
+				date					\
+			)						\
+		)
+	}
+}
+
+#
+# The way all write operations performed by dbinterface are performed occurs like this:
+#	dbinterface_Exists() checks to see whether an entry with label `l` already exists.
+#		If one does exist (success=0) then `dbinterface_Update()` is used.
+#		If none exists (success=1) then `dbinterface_Write()` is used.
+#
+# `dbinterface_Exists()` makes a call to `db_Search()` to see whether an entry with a given
+# label already exists. If it does, it returns `0`. Else, `1`.
+function dbinterface_Exists(db,label,Throw) {
+	return db_Search(db,1,label,2,Throw);
+};
 
 #
 # reference: db_Get(db,line)      				[1=err]
 #            db_Dissect(line,Arr) 				[1=less than 7 fields]
 #            db_Search(db,field,search,mode,Matches)		[1=none found]
-#            db_Update(db,line,user,new)			[1=line doesn't exist]
+#            db_Update(db,line,new)				[1=line doesn't exist]
 #            db_Add(db,entry,owner,contents) 
 # db_Field["label", "perms", "owner", "edited_by", "created", "edited", "contents"];
 #           1        2        3        4            5          6         7
 #
+
 ($2 == "PRIVMSG") && ($4 ~ /^::db$/) {
 	dbinterface_Db($0);
 }
