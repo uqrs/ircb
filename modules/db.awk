@@ -31,7 +31,7 @@ function db_Get(db,line,		c,l){
 function db_Dissect(line,Arr){
 	split(line,Arr,"\x1E");
 
-	return;
+	return 0;
 }
 
 #
@@ -93,7 +93,7 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 # Aside from these two parameters, db_Update() will also update the edit date.
 # This function does not add new entries, it only updates existing ones.
 #
-function db_Update(db,line,user,new,		Parts,l,count,date,tempfile){
+function db_Update(db,line,new,		Parts,l,count,date,tempfile){
 	array(Parts);
 	date=sys("date +%s");
 	tempfile=("/tmp/ircb-db-" rand()*1000000);
@@ -136,8 +136,8 @@ function db_Update(db,line,user,new,		Parts,l,count,date,tempfile){
 #	`db`       as the database the new entry should be stored in.
 #	`new`      as the new entry to be written to the database.
 function db_Add(db,new){
+	print new >> db ; close(db);
 
-	print new >> db;close(db);
 
 	return 0;
 }

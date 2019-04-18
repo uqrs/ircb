@@ -103,13 +103,12 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 # Aside from these two parameters, db_Update() will also update the edit date.
 # This function does not add new entries, it only updates existing ones.
 #
-function db_Update(db,line,new,		Parts,l,date,tempfile){
+function db_Update(db,line,new,		l,date,tempfile){
 	array(Parts);
 	date=sys("date +%s");
 
 	l=db_Get(db,line);
 	if ( l == "" ) { return 1 };
-	db_Dissect(l,Parts);
 
 	sys(												\
 		sprintf(										\
@@ -127,7 +126,7 @@ function db_Update(db,line,new,		Parts,l,date,tempfile){
 # It accepts a few arguments:
 #	`db`       as the database the new entry should be stored in.
 #	`new`      as the new entry to be written to the database.
-function db_Add(db,entry,owner,contents){
+function db_Add(db,new){
 	print new >> db;close(db);
 
 	return 0;
