@@ -81,10 +81,9 @@ function cut (string,begin,end,sep,fmt_sep,        out,Arr) {
 #
 # function: same as `cut` but accept an already-split array.
 #
-function acut(Arr,begin,end,sep,fmt_sep,	out) {
+function acut(Arr,begin,end,fmt_sep,	out) {
     (end != 0)     || (end=length(Arr));
-    (sep != "")    || (sep=FS);
-    (fmt_sep != "")|| (fmt_sep=sep);
+    (fmt_sep != "")|| (fmt_sep=FS);
 
     for (begin;begin<=end;begin++){
         out=(out Arr[begin] fmt_sep);
