@@ -52,7 +52,7 @@
 #  using these security features REQUIRES both `whois-sec.awk` and `mode-sec.awk`.
 #
 #  security features are automatically enabled for a database if this database
-#  has an authority channel assigned to it in the `db_Authority` array. 
+#  has an authority channel assigned to it in the `dbinterface_Authority` array. 
 #
 BEGIN {
 	#
@@ -75,23 +75,26 @@ BEGIN {
 	# the database authority channel is the channel from which e user-modes such
 	# as ~, &, @, %, + etc. are looked up.
 	#
-	db_Authority["remember"]="#cat-n";
+	dbinterface_Authority["remember"]="#cat-n";
+
+	#
+	# `dbinterface_Mask` specifies the default permissions for a newly allocated entry.
+	#
+	dbinterface_Mask["remember"]="rw-rw-rw-r--r--r--";
 	
 	#
 	# reference table for fields 
 	#
-	db_Field["label"]	=1;
-	db_Field["perms"]	=2;
-	db_Field["owner"]	=3;
-	db_Field["edited_by"]	=4;
-	db_Field["created"]	=5;
-	db_Field["modified"]	=6;
-	db_Field["contents"]	=7;
+	dbinterface_Field["label"]	=1;
+	dbinterface_Field["perms"]	=2;
+	dbinterface_Field["owner"]	=3;
+	dbinterface_Field["edited_by"]	=4;
+	dbinterface_Field["created"]	=5;
+	dbinterface_Field["modified"]	=6;
+	dbinterface_Field["contents"]	=7;
 
 	#
 	# message/response templates
-	#
-	# TODO: standardise the naming of these.
 	#
 	dbinterface_Template["no-db"]    ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
 
@@ -153,7 +156,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	# check to see whether this database has an authority channel
 	# assigned for it. If so, set `secure` to 1.
 	#
-	if (dbinterface_Use[$3] in db_Authority) {
+	if (dbinterface_Use[$3] in dbinterface_Authority) {
 		#
 		# If we're doing anything secure, make sure the user is identified.
 		#
@@ -375,8 +378,8 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	# perform the search
 	#
 	array(Results);
-	db=db_Persist[dbinterface_Use[$3]];
-	success=db_Search(db,db_Field["label"],Options["--"],2,Results);
+	db=dbinterface_Use[$3];
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,Results);
 
 	#
 	# if success isn't `0`, then no results were found.
@@ -388,7 +391,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 				$3,					\
 				"db => query-info",			\
 				Options["--"],				\
-				dbinterface_Use[$3]			\
+				db					\
 			)						\
 		)
 
@@ -398,14 +401,14 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 		# display found result.
 		#
 		array(Parts);
-		line=db_Get(db,Results[1]);
+		line=db_Get(db_Persist[db],Results[1]);
 		db_Dissect(line,Parts);
 
 		#
 		# if security for this channel is enabled, check permissions.
 		#
-		if (dbinterface_Use[$3] in db_Authority) {
-			success=dbinterface_Resolveperms(dbinterface_Use[$3],Parts,"r");
+		if (db in dbinterface_Authority) {
+			success=dbinterface_Resolveperms(db,Parts,"r");
 			if ( success == 1 ) {
 				#
 				# user is not permitted to read.
@@ -417,8 +420,8 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 						"db => query-info",						\
 						USER,								\
 						Options["--"],							\
-						modesec_Lookup[db_Authority[dbinterface_Use[$3]] " " USER],	\
-						Parts[db_Field["perms"]]					\
+						modesec_Lookup[dbinterface_Authority[db] " " USER],		\
+						Parts[dbinterface_Field["perms"]]				\
 					)									\
 				)
 
@@ -434,7 +437,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 				$3,					\
 				"db => query-info",			\
 				Parts[1],				\
-				dbinterface_Use[$3],			\
+				db,					\
 				Parts[3],				\
 				Parts[4],				\
 				created_at,				\
@@ -462,8 +465,8 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	# perform a search for the given database entry
 	#
 	array(Results);
-	db=db_Persist[dbinterface_Use[$3]];
-	success=db_Search(db,db_Field["label"],Options["--"],2,Results);
+	db=dbinterface_Use[$3];
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,Results);
 
 	if (success==1) {
 		send(							\
@@ -472,7 +475,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 				$3,					\
 				"db => query-show",			\
 				Options["--"],				\
-				dbinterface_Use[$3]			\
+				db					\
 			)						\
 		)
 		return 2;
@@ -481,7 +484,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	#
 	# get the actual line itself and display it.
 	#
-	line=db_Get(db,Results[1]);
+	line=db_Get(db_Persist[db],Results[1]);
 	db_Dissect(line,Parts);
 
 	send(								\
@@ -572,7 +575,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 	}
 
 	if ("f" in Options) {
-		if (!(Options["f"] in db_Field)) {
+		if (!(Options["f"] in dbinterface_Field)) {
 			send(							\
 				sprintf(					\
 					dbinterface_Template["opt-bogus-field"],\
@@ -591,9 +594,9 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 	# arguments figured out. Begin searching
 	#
 	array(Results);
-	db=db_Persist[dbinterface_Use[$3]];
-	use_field=db_Field[Options["f"]];
-	success=db_Search(db,use_field,Options["--"],mode,Results);
+	db=dbinterface_Use[$3];
+	use_field=dbinterface_Field[Options["f"]];
+	success=db_Search(db_Persist[db],use_field,Options["--"],mode,Results);
 
 	if (success==1) {
 		#
@@ -605,7 +608,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 				$3,						\
 				"db => query-search",				\
 				Options["--"],					\
-				dbinterface_Use[$3]				\
+				db						\
 			)							\
 		)
 
@@ -632,7 +635,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		# assemble our output string.
 		#
 		for (i = ((page-1)*10)+1 ; i<= (page*10) ; i++ ) {
-			success=db_Get(db,Results[i]);
+			success=db_Get(db_Persist[db],Results[i]);
 			if (success!=1) {
 				out=out cut(success,1,1,"\x1E",", ");
 			}
@@ -666,14 +669,14 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		# assemble our output string
 		#
-		line=db_Get(db,Results[result]);
+		line=db_Get(db_Persist[db],Results[result]);
 		db_Dissect(line,Parts);
 
 		#
 		# if security for this channel is enabled, check permissions.
 		#
-		if (dbinterface_Use[$3] in db_Authority) {
-			success=dbinterface_Resolveperms(dbinterface_Use[$3],Parts,"r");
+		if (db in dbinterface_Authority) {
+			success=dbinterface_Resolveperms(db,Parts,"r");
 			if ( success == 1 ) {
 				#
 				# user is not permitted to read.
@@ -684,9 +687,9 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 						$3,								\
 						"db => query-search",						\
 						USER,								\
-						Parts[db_Field["label"]],					\
-						modesec_Lookup[db_Authority[dbinterface_Use[$3]] " " USER],	\
-						Parts[db_Field["perms"]]					\
+						Parts[dbinterface_Field["label"]],				\
+						modesec_Lookup[dbinterface_Authority[db] " " USER],		\
+						Parts[dbinterface_Field["perms"]]				\
 					)									\
 				)
 
@@ -771,27 +774,27 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 	# attempt a search to see if an entry with this label already exists.
 	# call the appropriate function.
 	#
-	db=db_Persist[dbinterface_Use[$3]];
+	db=dbinterface_Use[$3];
 	array(Current);
 	date=sys("date +%s");
 
-	success=dbinterface_Exists(db,Options[what],Current);
+	success=dbinterface_Exists(db_Persist[db],Options[what],Current);
 
 	if (success==0) {
 		#
 		# entry exists. Update it.
 		#
-		old=db_Get(db,Current[1]);
+		old=db_Get(db_Persist[db],Current[1]);
 		db_Dissect(old,Parts);
 
-		Parts[db_Field["modified"]]=date;
-		Parts[db_Field["edited_by"]]=USER;
+		Parts[dbinterface_Field["modified"]]=date;
+		Parts[dbinterface_Field["edited_by"]]=USER;
 
 		#
 		# if security for this channel is enabled, check permissions.
 		#
-		if (dbinterface_Use[$3] in db_Authority) {
-			success=dbinterface_Resolveperms(dbinterface_Use[$3],Parts,"w");
+		if (db in dbinterface_Authority) {
+			success=dbinterface_Resolveperms(db,Parts,"w");
 			if ( success == 1 ) {
 				#
 				# user is not permitted to write.
@@ -802,18 +805,18 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 						$3,								\
 						"db => sync-update/" op,					\
 						USER,								\
-						Parts[db_Field["label"]],					\
-						modesec_Lookup[db_Authority[dbinterface_Use[$3]] " " USER],	\
-						Parts[db_Field["perms"]]					\
+						Parts[dbinterface_Field["label"]],				\
+						modesec_Lookup[dbinterface_Authority[db] " " USER],		\
+						Parts[dbinterface_Field["perms"]]				\
 					)									\
 				)
 
 				return 3;
 			}
 		}
-		if      ( what == "w" ) {Parts[db_Field["contents"]]=Options["--"]}
-		else if ( what == "a" ) {Parts[db_Field["contents"]]=Parts[db_Field["contents"]] " " Options["--"]}
-		else if ( what == "p" ) {Parts[db_Field["contents"]]=Options["--"] " " Parts[db_Field["contents"]]}
+		if      ( what == "w" ) {Parts[dbinterface_Field["contents"]]=Options["--"]}
+		else if ( what == "a" ) {Parts[dbinterface_Field["contents"]]=Parts[dbinterface_Field["contents"]] " " Options["--"]}
+		else if ( what == "p" ) {Parts[dbinterface_Field["contents"]]=Options["--"] " " Parts[dbinterface_Field["contents"]]}
 		else if ( what == "r" ) {
 			sub(/^ +/,"",Options["--"]);
 			sub(/ +$/,"",Options["--"]);
@@ -832,22 +835,22 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 				return 1;
 			}
 
-			gsub(Sub[2],Sub[3],Parts[db_Field["contents"]]);
+			gsub(Sub[2],Sub[3],Parts[dbinterface_Field["contents"]]);
 
 		}
 
-		gsub(/ +/," ",Parts[db_Field["contents"]]);
-		db_Update(db,Current[1],acut(Parts,1,7,"\x1E"));
+		gsub(/ +/," ",Parts[dbinterface_Field["contents"]]);
+		db_Update(db_Persist[db],Current[1],acut(Parts,1,7,"\x1E"));
 
 		send(							\
 			sprintf(					\
 				dbinterface_Template["update-success"],	\
 				$3,					\
 				"db => sync-update/" op,		\
-				Parts[db_Field["label"]],		\
-				Parts[db_Field["owner"]],		\
+				Parts[dbinterface_Field["label"]],	\
+				Parts[dbinterface_Field["owner"]],	\
 				USER,					\
-				Parts[db_Field["perms"]],		\
+				Parts[dbinterface_Field["perms"]],	\
 				date					\
 			)						\
 		)
@@ -858,7 +861,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		new=sprintf(						\
 			"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
 			Options[what],					\
-			"rw-rw-rw-r--r--r--",				\
+			dbinterface_Mask[db],				\
 			USER,						\
 			USER,						\
 			date,						\
@@ -867,7 +870,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		)
 
 		# TODO: actually do something with `success`.
-		success=db_Add(db,new);
+		success=db_Add(db_Persist[db],new);
 
 		send(							\
 			sprintf(					\
@@ -877,7 +880,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 				Options[what],				\
 				USER,					\
 				USER,					\
-				"rw-rw-rw-r--r--r--",			\
+				dbinterface_Mask[db],			\
 				date					\
 			)						\
 		)
@@ -892,8 +895,8 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 #
 # `dbinterface_Exists()` makes a call to `db_Search()` to see whether an entry with a given
 # label already exists. If it does, it returns `0`. Else, `1`.
-function dbinterface_Exists(db,label,Throw) {
-	return db_Search(db,1,label,2,Throw);
+function dbinterface_Exists(db_file,label,Throw) {
+	return db_Search(db_file,1,label,2,Throw);
 };
 
 #
@@ -901,7 +904,7 @@ function dbinterface_Exists(db,label,Throw) {
 # (a dissected entry, as one might expect from `db_Dissect()` and checks to see whether the
 # called is permitted to perform operation `perm`.
 #
-# This function requires an allocated entry in `db_Authority` (db_Authority[db] != "")
+# This function requires an allocated entry in `dbinterface_Authority` (dbinterface_Authority[db] != "")
 #
 function dbinterface_Resolveperms(db,Parts,perm,	effective_rank) {
 	#
@@ -909,13 +912,13 @@ function dbinterface_Resolveperms(db,Parts,perm,	effective_rank) {
 	#	- '~' if USER is the owner of this entry
 	#	- the rank assigned to the user in db_Lookup
 	#
-	if ( Parts[db_Field["owner"]] == USER ) {
+	if ( Parts[dbinterface_Field["owner"]] == USER ) {
 		effective_rank="~";
 	} else {
-		effective_rank=modesec_Lookup[db_Authority[db] " " USER];
+		effective_rank=modesec_Lookup[dbinterface_Authority[db] " " USER];
 	}
 
-	allocated_perms=substr(Parts[db_Field["perms"]],(modesec_Ranks[effective_rank] * 3)+1,3);
+	allocated_perms=substr(Parts[dbinterface_Field["perms"]],(modesec_Ranks[effective_rank] * 3)+1,3);
 	return (!(allocated_perms ~ perm));
 }
 #
@@ -924,7 +927,7 @@ function dbinterface_Resolveperms(db,Parts,perm,	effective_rank) {
 #            db_Search(db,field,search,mode,Matches)		[1=none found]
 #            db_Update(db,line,new)				[1=line doesn't exist]
 #            db_Add(db,entry,owner,contents) 
-# db_Field["label", "perms", "owner", "edited_by", "created", "edited", "contents"];
+# dbinterface_Field["label", "perms", "owner", "edited_by", "created", "edited", "contents"];
 #           1        2        3        4            5          6         7
 #
 
