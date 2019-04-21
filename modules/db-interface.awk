@@ -4,20 +4,20 @@
 # REQUIRES either db.awk or alt/db-ed.awk
 #
 # Database contents are stored as:
-# [entryname]\x1E[permissions]\x1E[owner]\x1E[editedby]\x1E[creationdate]\x1E[lastedited]\x1E[contents]\n
-# [entryname] is the name of the entry itself.
-# [permissions] is a string of 14 characters that stores read-write permissions for every irc-rank from none to ~
+# [label]\x1E[perms]\x1E[owner]\x1E[edited_by]\x1E[created]\x1E[modified]\x1E[contents]\n
+# [label] is the name of the entry itself.
+# [perms] is a string of 14 characters that stores read-write permissions for every irc-rank from none to ~
 #               the layout is:
-#                o   ~   &   @   %   +   n
-#               [rw][rw][rw][rw][rw][rw][rw]
-# where `o` denotes `owner`, and `n` denotes `none`.
-# note that not every module that uses databases requires this(!) It is just a feature that is essential for
-# certain modules that make use of `db.awk`
+#                ~    &    @    %    +    " "
+#               [rw-][rw-][rw-][rw-][rw-][rw-]
+#         where 'r' = read
+#               'w' = write
+#               '-' = reserved for potential future features.
 #
 # [owner] is the nickname string of the individual who first allocated this entry
-# [editedby] is the nickname string of the individual who last modified this entry
-# [creationdate] is epoch describing when the entry was first allocated
-# [lastedited] is epoch describing when the entry was last modified
+# [edited_by] is the nickname string of the individual who last modified this entry
+# [created] is epoch describing when the entry was first allocated
+# [modified] is epoch describing when the entry was last modified
 # [contents] is a NL-terminated string of characters depicting the actual contents of this entry.
 #
 # FLAGS (GENERAL)
@@ -46,6 +46,13 @@
 #     DATABASE META MODIFICATION
 #       -c        change permissions for entry
 #       -C        change ownership of entry
+#
+# SECURITY
+#  db-interface makes use of a joint nickserv-security and mode-security implementation
+#  using these security features REQUIRES both `whois-sec.awk` and `mode-sec.awk`.
+#
+#  security features are automatically enabled for a database if this database
+#  has an authority channel assigned to it in the `db_Authority` array. 
 #
 BEGIN {
 	#
@@ -86,34 +93,46 @@ BEGIN {
 	#
 	# TODO: standardise the naming of these.
 	#
-	dbinterface_Template["err_opts"] ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
-	dbinterface_Template["conflict"] ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
-	dbinterface_Template["neither"]  ="PRIVMSG %s :[%s] fatal: one of %s is required.";
-	dbinterface_Template["neither_c"]="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
-	dbinterface_Template["invalid"]  ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
-	dbinterface_Template["no-entry"] ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
-	dbinterface_Template["not-found"]="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
 	dbinterface_Template["no-db"]    ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
-	dbinterface_Template["result-info"]	="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s\x02; Last modified by: \x0F%s\x02 -- Created at: \x0F%s; \x02Last modified at: \x0F%s\x02 -- Permissions: \x0F%s;"
-	dbinterface_Template["result-show"]="PRIVMSG %s :[%s] %s %s";
-	dbinterface_Template["search-result-show"]="PRIVMSG %s :[%s][%d/%d] %s %s";
-	dbinterface_Template["no-number"]="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
-	dbinterface_Template["no-query"] ="PRIVMSG %s :[%s] fatal: no search query specified.";
-	dbinterface_Template["no-matches"]="PRIVMSG %s :[%s] fatal: no results for query '%s'.";
-	dbinterface_Template["search-results"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
-	dbinterface_Template["invalid-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
-	dbinterface_Template["no-write"]="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
-	dbinterface_Template["no-write-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
-	dbinterface_Template["write-success"]="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
-	dbinterface_Template["update-success"]="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
-	dbinterface_Template["substitute-usage"]="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`"
+
+	#
+	# errors for invalid options
+	#
+	dbinterface_Template["opt-err"]        ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
+	dbinterface_Template["opt-conflict"]   ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
+	dbinterface_Template["opt-neither"]    ="PRIVMSG %s :[%s] fatal: one of %s is required.";
+	dbinterface_Template["opt-neither-c"]  ="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
+	dbinterface_Template["opt-invalid"]    ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
+	dbinterface_Template["opt-ns-entry"]   ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
+	dbinterface_Template["opt-noarg"]      ="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
+	dbinterface_Template["opt-no-query"]   ="PRIVMSG %s :[%s] fatal: no search query specified.";
+	dbinterface_Template["opt-bogus-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
+	dbinterface_Template["opt-no-write"]   ="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
+	dbinterface_Template["opt-write-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
+	#
+	# non-error results
+	#
+	dbinterface_Template["query-no-results"] ="PRIVMSG %s :[%s] fatal: no results for query '%s' in database `%s`.";
+	dbinterface_Template["query-not-found"]  ="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
+	dbinterface_Template["query-info"]       ="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s\x02; Last modified by: \x0F%s\x02 -- Created at: \x0F%s; \x02Last modified at: \x0F%s\x02 -- Permissions: \x0F%s;"
+	dbinterface_Template["query-show"]       ="PRIVMSG %s :[%s] %s %s";
+	dbinterface_Template["query-search-show"]="PRIVMSG %s :[%s][%d/%d] %s %s";
+	dbinterface_Template["query-search-page"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
+	dbinterface_Template["write-success"]    ="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
+	dbinterface_Template["update-success"]   ="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
+	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`"
+	#
+	# denied permissions
+	#
+	dbinterface_Template["perm-no-read"]     ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to read entry `%s` (%s:%s)";
+	dbinterface_Template["perm-no-write"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify entry `%s` (%s:%s)";
 }
 
 #
 # top-level function: check the input option string, and
 # call the appropriate function.
 #
-function dbinterface_Db(input,		success,argstring,Options) {
+function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	#
 	# make sure a database is allocated
 	#
@@ -128,14 +147,31 @@ function dbinterface_Db(input,		success,argstring,Options) {
 		)
 
 		return 2;
+	};
+
+	#
+	# check to see whether this database has an authority channel
+	# assigned for it. If so, set `secure` to 1.
+	#
+	if (dbinterface_Use[$3] in db_Authority) {
+		#
+		# If we're doing anything secure, make sure the user is identified.
+		#
+		secure=1;
+
+		if ( whois_Whois(USER,$0,"db-interface",$3,"(authority for " dbinterface_Use[$3] ": " $3 ")") == 1 ) {
+			return 1;
+		}
 	}
+	else { secure=0; }
+
 	#
 	# parse the options
 	#
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s:,O,T,c,C",Options);
+	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c,C",Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -143,7 +179,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 	if (success == 1) {
 		send(										\
 			sprintf(								\
-				dbinterface_Template["err_opts"],				\
+				dbinterface_Template["opt-err"],				\
 				$3,								\
 				"db => getopt",							\
 				Options[0]							\
@@ -162,7 +198,7 @@ function dbinterface_Db(input,		success,argstring,Options) {
 			#
 			send(							\
 				sprintf(					\
-					dbinterface_Template["neither"],	\
+					dbinterface_Template["opt-neither"],	\
 					$3,					\
 					"db => getopt",				\
 					"`-Q` or `-S`"				\
@@ -176,11 +212,11 @@ function dbinterface_Db(input,		success,argstring,Options) {
 			#
 			send(							\
 				sprintf(					\
-					dbinterface_Template["conflict"],	\
+					dbinterface_Template["opt-conflict"],	\
 					$3,					\
 					"db => getopt",				\
-					Options[0],				\
-					Options[-1]				\
+					"-" Options[0],				\
+					"-" Options[-1]				\
 				)						\
 			)
 		} else
@@ -202,10 +238,10 @@ function dbinterface_Db(input,		success,argstring,Options) {
 					#
 					send(							\
 						sprintf(					\
-							dbinterface_Template["invalid"],	\
+							dbinterface_Template["opt-invalid"],	\
 							$3,					\
 							"db => getopt",				\
-							Options[0],				\
+							"-" Options[0],				\
 							"-Q"					\
 						)						\
 					);
@@ -231,11 +267,11 @@ function dbinterface_Db(input,		success,argstring,Options) {
 					#
 					send(							\
 						sprintf(					\
-							dbinterface_Template["conflict"],	\
+							dbinterface_Template["opt-conflict"],	\
 							$3,					\
 							"db => getopt",				\
-							Options[0],				\
-							Options[-1]				\
+							"-" Options[0],				\
+							"-" Options[-1]				\
 						)						\
 					)
 
@@ -253,27 +289,27 @@ function dbinterface_Db(input,		success,argstring,Options) {
 				#
 				# filter/blacklist out operations that do not apply to `-S`
 				#
-				success=getopt_Uncompatible(Options,"rEFif");
+				success=getopt_Uncompatible(Options,"EFif");
 				if (success==1) {
 					#
 					# incompatible options found; complain
 					#
 					send(							\
 						sprintf(					\
-							dbinterface_Template["invalid"],	\
+							dbinterface_Template["opt-invalid"],	\
 							$3,					\
 							"db => getopt",				\
-							Options[0],				\
-							"-Q"					\
+							"-" Options[0],				\
+							"-S"					\
 						)						\
 					);
 
 					return 1;
 				}
 				#
-				# look for one of `-w`, `-a`, `-s`, or `-p`
+				# look for one of `-w`, `-a`, `-r`, or `-p`
 				#
-				success=getopt_Either(Options,"wasp");
+				success=getopt_Either(Options,"warp");
 
 				if (success == 1) {
 					#
@@ -281,10 +317,10 @@ function dbinterface_Db(input,		success,argstring,Options) {
 					#
 					send(							\
 						sprintf(					\
-							dbinterface_Template["neither_c"],	\
+							dbinterface_Template["opt-neither-c"],	\
 							$3,					\
 							"db => getopt",				\
-							"`-w`, `-a`, `-s`, or `-p`",		\
+							"`-w`, `-a`, `-r`, or `-p`",		\
 							"-S"					\
 						)						\
 					)
@@ -297,11 +333,11 @@ function dbinterface_Db(input,		success,argstring,Options) {
 					#
 					send(							\
 						sprintf(					\
-							dbinterface_Template["conflict"],	\
+							dbinterface_Template["opt-conflict"],	\
 							$3,					\
 							"db => getopt",				\
-							Options[0],				\
-							Options[-1]				\
+							"-" Options[0],				\
+							"-" Options[-1]				\
 						)						\
 					)
 
@@ -327,7 +363,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	if (Options["--"] == "") {
 		send(							\
 			sprintf(					\
-				dbinterface_Template["no-entry"],	\
+				dbinterface_Template["opt-ns-entry"],	\
 				$3,					\
 				"db => query-info"			\
 			)						\
@@ -348,7 +384,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	if (success==1) {
 		send(							\
 			sprintf(					\
-				dbinterface_Template["not-found"],	\
+				dbinterface_Template["query-not-found"],\
 				$3,					\
 				"db => query-info",			\
 				Options["--"],				\
@@ -365,11 +401,36 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 		line=db_Get(db,Results[1]);
 		db_Dissect(line,Parts);
 
+		#
+		# if security for this channel is enabled, check permissions.
+		#
+		if (dbinterface_Use[$3] in db_Authority) {
+			success=dbinterface_Resolveperms(dbinterface_Use[$3],Parts,"r");
+			if ( success == 1 ) {
+				#
+				# user is not permitted to read.
+				#
+				send(										\
+					sprintf(								\
+						dbinterface_Template["perm-no-read"],				\
+						$3,								\
+						"db => query-info",						\
+						USER,								\
+						Options["--"],							\
+						modesec_Lookup[db_Authority[dbinterface_Use[$3]] " " USER],	\
+						Parts[db_Field["perms"]]					\
+					)									\
+				)
+
+				return 4;
+			}
+		}
+
 		created_at=sys("date -d '@" Parts[5] "'");
 		modified_at=sys("date -d '@" Parts[6] "'");
 		send(							\
 			sprintf(					\
-				dbinterface_Template["result-info"],	\
+				dbinterface_Template["query-info"],	\
 				$3,					\
 				"db => query-info",			\
 				Parts[1],				\
@@ -389,7 +450,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	if ((Options["--"]=="")) {
 		send(							\
 			sprintf(					\
-				dbinterface_Template["no-entry"],	\
+				dbinterface_Template["opt-ns-entry"],	\
 				$3,					\
 				"db => query-show"			\
 			)						\
@@ -407,7 +468,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	if (success==1) {
 		send(							\
 			sprintf(					\
-				dbinterface_Template["not-found"],	\
+				dbinterface_Template["query-not-found"],\
 				$3,					\
 				"db => query-show",			\
 				Options["--"],				\
@@ -425,7 +486,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 
 	send(								\
 		sprintf(						\
-			dbinterface_Template["result-show"],		\
+			dbinterface_Template["query-show"],		\
 			$3,						\
 			"db => query-show",				\
 			Parts[1],					\
@@ -438,7 +499,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 	if ((Options["--"]=="")) {
 		send(							\
 			sprintf(					\
-				dbinterface_Template["no-query"],	\
+				dbinterface_Template["opt-no-query"],	\
 				$3,					\
 				"db => query-search"			\
 			)						\
@@ -458,11 +519,11 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		send(							\
 			sprintf(					\
-				dbinterface_Template["conflict"],	\
+				dbinterface_Template["opt-conflict"],	\
 				$3,					\
 				"db => query-search",			\
-				"-E",					\
-				"-F"					\
+				"-" Options[0],				\
+				"-" Options[-1]				\
 			)						\
 		)
 
@@ -480,11 +541,11 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		send(							\
 			sprintf(					\
-				dbinterface_Template["conflict"],	\
+				dbinterface_Template["opt-conflict"],	\
 				$3,					\
 				"db => query-search",			\
-				"-p",					\
-				"-r"					\
+				"-" Options[0],				\
+				"-" Options[-1]				\
 			)						\
 		)
 
@@ -500,7 +561,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		send(							\
 			sprintf(					\
-				dbinterface_Template["no-number"],	\
+				dbinterface_Template["opt-noarg"],	\
 				$3,					\
 				"db => query-search",			\
 				Options[0]				\
@@ -514,7 +575,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		if (!(Options["f"] in db_Field)) {
 			send(							\
 				sprintf(					\
-					dbinterface_Template["invalid-field"],	\
+					dbinterface_Template["opt-bogus-field"],\
 					$3,					\
 					"db => query-search"			\
 				)						\
@@ -538,13 +599,14 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		# no results found. complain.
 		#
-		send(							\
-			sprintf(					\
-				dbinterface_Template["no-matches"],	\
-				$3,					\
-				"db => query-search",			\
-				Options["--"]				\
-			)						\
+		send(								\
+			sprintf(						\
+				dbinterface_Template["query-no-results"],	\
+				$3,						\
+				"db => query-search",				\
+				Options["--"],					\
+				dbinterface_Use[$3]				\
+			)							\
 		)
 
 		return 5;
@@ -577,15 +639,15 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		}
 
 		sub(/, $/,"",out)
-		send(							\
-			sprintf(					\
-				dbinterface_Template["search-results"],	\
-				$3,					\
-				"db => query-search",			\
-				page,					\
-				maxpage,				\
-				out					\
-			)						\
+		send(								\
+			sprintf(						\
+				dbinterface_Template["query-search-page"],	\
+				$3,						\
+				"db => query-search",				\
+				page,						\
+				maxpage,					\
+				out						\
+			)							\
 		)
 	} else {
 		#
@@ -606,6 +668,31 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		line=db_Get(db,Results[result]);
 		db_Dissect(line,Parts);
+
+		#
+		# if security for this channel is enabled, check permissions.
+		#
+		if (dbinterface_Use[$3] in db_Authority) {
+			success=dbinterface_Resolveperms(dbinterface_Use[$3],Parts,"r");
+			if ( success == 1 ) {
+				#
+				# user is not permitted to read.
+				#
+				send(										\
+					sprintf(								\
+						dbinterface_Template["perm-no-read"],				\
+						$3,								\
+						"db => query-search",						\
+						USER,								\
+						Parts[db_Field["label"]],					\
+						modesec_Lookup[db_Authority[dbinterface_Use[$3]] " " USER],	\
+						Parts[db_Field["perms"]]					\
+					)									\
+				)
+
+				return 6;
+			}
+		}
 
 		#
 		# add colour-coding/formatting to which part of the string was matched.
@@ -633,7 +720,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 
 		send(								\
 			sprintf(						\
-				dbinterface_Template["search-result-show"],	\
+				dbinterface_Template["query-search-show"],	\
 				$3,						\
 				"db => query-show",				\
 				result,						\
@@ -648,7 +735,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,sep)  {
 	if      ("w" in Options) {what="w";op="write"}
 	else if ("a" in Options) {what="a";op="append"}
-	else if ("s" in Options) {what="s";op="substitute"}
+	else if ("r" in Options) {what="r";op="replace"}
 	else if ("p" in Options) {what="p";op="prepend"}
 
 	if ((Options[what]=="")) {
@@ -657,7 +744,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		#
 		send(							\
 			sprintf(					\
-			     dbinterface_Template["no-write-entry"],	\
+			     dbinterface_Template["opt-write-entry"],	\
 			     $3,					\
 			     "db => sync-" op				\
 			)						\
@@ -671,7 +758,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		#
 		send(							\
 			sprintf(					\
-				dbinterface_Template["no-write"],	\
+				dbinterface_Template["opt-no-write"],	\
 				$3,					\
 				"db => sync-" op			\
 			)						\
@@ -700,10 +787,34 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		Parts[db_Field["modified"]]=date;
 		Parts[db_Field["edited_by"]]=USER;
 
+		#
+		# if security for this channel is enabled, check permissions.
+		#
+		if (dbinterface_Use[$3] in db_Authority) {
+			success=dbinterface_Resolveperms(dbinterface_Use[$3],Parts,"w");
+			if ( success == 1 ) {
+				#
+				# user is not permitted to write.
+				#
+				send(										\
+					sprintf(								\
+						dbinterface_Template["perm-no-write"],				\
+						$3,								\
+						"db => sync-update/" op,					\
+						USER,								\
+						Parts[db_Field["label"]],					\
+						modesec_Lookup[db_Authority[dbinterface_Use[$3]] " " USER],	\
+						Parts[db_Field["perms"]]					\
+					)									\
+				)
+
+				return 3;
+			}
+		}
 		if      ( what == "w" ) {Parts[db_Field["contents"]]=Options["--"]}
 		else if ( what == "a" ) {Parts[db_Field["contents"]]=Parts[db_Field["contents"]] " " Options["--"]}
 		else if ( what == "p" ) {Parts[db_Field["contents"]]=Options["--"] " " Parts[db_Field["contents"]]}
-		else if ( what == "s" ) {
+		else if ( what == "r" ) {
 			sub(/^ +/,"",Options["--"]);
 			sub(/ +$/,"",Options["--"]);
 
@@ -747,7 +858,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		new=sprintf(						\
 			"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
 			Options[what],					\
-			"rwrwrw",					\
+			"rw-rw-rw-r--r--r--",				\
 			USER,						\
 			USER,						\
 			date,						\
@@ -766,7 +877,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 				Options[what],				\
 				USER,					\
 				USER,					\
-				"rwrwrw",				\
+				"rw-rw-rw-r--r--r--",			\
 				date					\
 			)						\
 		)
@@ -785,6 +896,28 @@ function dbinterface_Exists(db,label,Throw) {
 	return db_Search(db,1,label,2,Throw);
 };
 
+#
+# `dbinterface_Resolveperms` has only one job: it takes a single database entry 'Parts'
+# (a dissected entry, as one might expect from `db_Dissect()` and checks to see whether the
+# called is permitted to perform operation `perm`.
+#
+# This function requires an allocated entry in `db_Authority` (db_Authority[db] != "")
+#
+function dbinterface_Resolveperms(db,Parts,perm,	effective_rank) {
+	#
+	# `effective_rank` is either:
+	#	- '~' if USER is the owner of this entry
+	#	- the rank assigned to the user in db_Lookup
+	#
+	if ( Parts[db_Field["owner"]] == USER ) {
+		effective_rank="~";
+	} else {
+		effective_rank=modesec_Lookup[db_Authority[db] " " USER];
+	}
+
+	allocated_perms=substr(Parts[db_Field["perms"]],(modesec_Ranks[effective_rank] * 3)+1,3);
+	return (!(allocated_perms ~ perm));
+}
 #
 # reference: db_Get(db,line)      				[1=err]
 #            db_Dissect(line,Arr) 				[1=less than 7 fields]

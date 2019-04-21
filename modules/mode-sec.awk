@@ -8,21 +8,21 @@ BEGIN {
 	#
 	# the modesec_Lookup array contains sub-arrays for each individual channel.
 	# each of these individual channel-arrays contain key-value pairs in the form of
-	# modesec_Lookup["#channel"]["nick"] = "r", where `r` is one of ~, &, @, %, + or " ".
+	# modesec_Lookup["#channel" "nick"] = "r", where `r` is one of ~, &, @, %, + or " ".
 	#
 	array(modesec_Lookup);
 
 	#
 	# the modesec_Ranks array contains key-value pairs denoting numerical
 	# representation of various ranks. This way, to tell whether user A's rank
-	# is higher than user B's rank, one can do `modesec_Rank[a_rank] > modesec_Rank[b_rank]`
+	# is higher than user B's rank, one can do `modesec_Rank[a_rank] < modesec_Rank[b_rank]`
 	#
-	modesec_Ranks[" "]=0;
-	modesec_Ranks["+"]=1;
-	modesec_Ranks["%"]=2;
-	modesec_Ranks["@"]=3;
-	modesec_Ranks["&"]=4;
-	modesec_Ranks["~"]=5;
+	modesec_Ranks[" "]=5;
+	modesec_Ranks["+"]=4;
+	modesec_Ranks["%"]=3;
+	modesec_Ranks["@"]=2;
+	modesec_Ranks["&"]=1;
+	modesec_Ranks["~"]=0;
 
 	#
 	# modesec_Temp: see comment on `353` vs. `366` below.
