@@ -19,7 +19,7 @@ netcat my.irc.network 6667 <in | awk -f ircb.awk -f modules/boot.awk -f modules/
 For information on module usage, check the actual `.awk` file.
 
 ## configuration
-**How not to configure ircb:** open each individual module file and modify the variables in the `BEGIN` block.
+**How not to configure ircb:** open each individual module file and modify the variables in the `BEGIN` block.  
 **How to configure ircb:** write a `config.awk` with a `BEGIN` block where you declare your configuration variables. Include this after every other module using `-f`
 
 ## i18n
@@ -27,13 +27,11 @@ Write a `lang.awk` file where you overwrite response templates. Include this aft
 ```
 # es.awk
 BEGIN {
-	dbinterface_Template["conflict"] = "Error fatal: opciones conflictivas `%s` y `%s` especificado."
+	dbinterface_Template["conflict"] = "[%s] Error fatal: opciones conflictivas `%s` y `%s` especificado."
 }
 ```
 
 ## tips
-irc logger: `/usr/bin/tee`
-
-configuration variables are denoted with `###`.
-
+irc logger: `/usr/bin/tee`  
+configuration variables are denoted with `###`.  
 ircd weirdness is documented using `##`

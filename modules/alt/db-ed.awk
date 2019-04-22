@@ -48,7 +48,8 @@ function db_Dissect(entry,Arr){
 #
 # `mode` may be 0 for a regular word-search, 2 for exact matching, or 1 for a regex search.
 #
-# returns a '1' if no matches were found. '0' otherwise.
+# returns: `0` if at least one match was found
+#          `1` otherwise.
 #
 function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 	array(Parts);array(Matches);

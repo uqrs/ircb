@@ -7,15 +7,19 @@
 #
 # if cfg/boot_nspass exists, authenticate with nickserv on joining
 #
+# returns: `1` on missing boot_nspass file.
+#          `0` on no error.
+#
+#
 function boot_Nickserv(		pass,success){
-    success=0;
     if ((getline pass < "cfg/boot_nspass")>0) {
         ## modify nickserv authentication command if needed.
         send("PRIVMSG nickserv :identify " pass);
-        success=1;
-    }; close("cfg/boot_nspass");
+	close("cfg/boot_nspass");
+	return 0;
+    };
 
-    return success;
+    return 1;
 }
 
 #
@@ -28,7 +32,7 @@ function boot_Commands(		command){
 }
 
 ## some ircds may not use end-of-motd, who knows. modify if necessary.
-($2 == "376")                                               {boot_Nickserv() || boot_Commands()}
+($2 == "376")                                               {(!boot_Nickserv()) || boot_Commands()}
 ## some nickserv instances may use a different string; modify if necessary.
 ($1 ~ /^:NickServ!/) && (tolower($0) ~ /password accepted/) {boot_Commands()}
 

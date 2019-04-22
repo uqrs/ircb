@@ -58,12 +58,14 @@ BEGIN {
 	#
 	# databases are flat files that store actual information.
 	#
-	db_Persist["remember"]="./data/db/remember-db";
+
+	#db_Persist["remember"]="./data/db/remember-db";
 
 	#
 	# `dbinterface_Use` specifies which database a given channel should use.
 	#
-	dbinterface_Use["#cat-n"]="remember";
+
+	#dbinterface_Use["#channel"]="remember";
 
 	#
 	# dbinterface_color specifies whether output is formatted using colours.
@@ -75,7 +77,8 @@ BEGIN {
 	# the database authority channel is the channel from which e user-modes such
 	# as ~, &, @, %, + etc. are looked up.
 	#
-	dbinterface_Authority["remember"]="#cat-n";
+	
+	#dbinterface_Authority["remember"]="#channel";
 
 	#
 	# `dbinterface_Mask` specifies the default permissions for a newly allocated entry.

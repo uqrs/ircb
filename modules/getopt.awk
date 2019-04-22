@@ -6,6 +6,11 @@
 #    if there is no `:`, then every argument specified after this flag will
 #    automatically be deferred to `--` (stdarg).
 #
+# return values: `1` on invalid flag (Out[0] = the invalid flag).
+#                `2` on single `-` (TODO: have this treated as an argument).
+#                `3` on unterminated string (Out[0] = the option this invalid string was for).
+#                `0` on no errors
+#
 function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT_OPT,OPT_END,OPT_ACCEPT_TEMP,OPT_ACCEPT,TERMINATOR,TERMINATOR_LOC,CURRENT_ARG) {
 	POSITION=1;
 	REMAINDER=(input " ");
@@ -77,7 +82,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 				#
 				# just a lone `-` with no options behind it.
 				#
-				return 1;
+				return 2;
 			} else {
 				#
 				# get the list of options and go through these one-by-one.
@@ -117,7 +122,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 			#
 			# return pre-emptively if no matching quotes were found.
 			#
-			if (TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return 2;}
+			if (TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return 3;}
 
 			#
 			# keep looking for backslashes until we find no more
@@ -139,7 +144,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 					# if no terminator was found, we have an error:
 					# no matching close-brace found.
 					#
-					if ( TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return 2;}
+					if ( TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return 3;}
 				}
 			}
 			Out[CURRENT_OPT]=Out[CURRENT_OPT] " " CURRENT_ARG substr(REMAINDER,1,TERMINATOR_LOC-1);

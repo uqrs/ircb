@@ -31,6 +31,9 @@ BEGIN {
 # top-level function; "is the user identified?"
 # needs: username (USER), command ($0), context (module name), environment (channel) and extra (extra info);
 #
+# returns: `0` on identified user.
+#          `1` on invalid or race condition.
+#
 function whois_Whois(who,command,context,environment,extra){
 	#
 	# we identify users case-insensitively
@@ -69,6 +72,10 @@ function whois_Whois(who,command,context,environment,extra){
 
 #
 # verify if the user session is still valid
+#
+# returns: `0` on identified user.
+#          `1` on unidentifier user.
+#          `2` on expired session.
 #
 function whois_validsession(who){
 	if ((who in whois_Db) == 0) {

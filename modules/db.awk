@@ -14,6 +14,9 @@
 #	`line` always refers to a line number in a given database file.
 #	to discover the number for a line based on a field, use `db_Search()`.
 #
+# returns: `l` the retrieved line on success.
+#          `1` if no line was found.
+#
 function db_Get(db,line,		c,l){
 	while ((getline l < db) > 0) {
 		if (++c==line){close(db);return l}
@@ -40,7 +43,8 @@ function db_Dissect(line,Arr){
 #
 # `mode` may be 0 for a regular word-search, 1 for a regex search, or 2 for exact-matching.
 #
-# returns a '1' if no matches were found. '0' otherwise.
+# returns: `0` if at least one match was found
+#          `1` if none were found
 #
 function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 	array(Parts);
@@ -137,7 +141,6 @@ function db_Update(db,line,new,		Parts,l,count,date,tempfile){
 #	`new`      as the new entry to be written to the database.
 function db_Add(db,new){
 	print new >> db ; close(db);
-
 
 	return 0;
 }
