@@ -76,6 +76,7 @@ function db_Search(db,field,search,mode,invert,Matches,		Parts,line,count){
 	} else {
 		while ((getline l < db) > 0) {
 			count++;
+			db_Dissect(l,Parts);
 
 			if ((tolower(Parts[field]) ~ tolower(search)) == !invert) {Matches[length(Matches)+1]=count;}
 		}
