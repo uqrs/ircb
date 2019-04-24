@@ -47,12 +47,15 @@ function db_Dissect(entry,Arr){
 # it populates the given array `Matches` with line numbers.
 #
 # `mode` may be 0 for a regular word-search, 2 for exact matching, or 1 for a regex search.
+# `invert` may be 0 for a non-matching, or 1 for matching.
 #
 # returns: `0` if at least one match was found
 #          `1` otherwise.
 #
-function db_Search(db,field,search,mode,Matches,		Parts,line,count){
-	array(Parts);array(Matches);
+function db_Search(db,field,search,mode,invert,Matches,		Parts,line,count){
+	array(Parts);
+
+	invert || (invert=0);
 	#
 	# if mode is `0`, perform a regular search.
 	#
@@ -60,19 +63,17 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 		while ((getline l < db) > 0){
 			count++;
 			db_Dissect(l,Parts);
-
-			if (tolower(Parts[field]) ~ tolower(rsan(search))) {Matches[length(Matches)+1]=count;}
+			if ((tolower(Parts[field]) ~ tolower(rsan(search))) == !invert) {Matches[length(Matches)+1]=count;}
 		}
 	} else
 	#
-	# if mode is `2`, perform an exact match.
+	# else, if it's `2`, perform a word-match
 	#
-	if ( mode == 2 ) {
+	if ( mode == 2) {
 		while ((getline l < db) > 0){
-			count++;
+			count++
 			db_Dissect(l,Parts);
-
-			if (tolower(Parts[field]) == tolower(search)) {Matches[length(Matches)+1]=count;}
+			if ((tolower(Parts[field]) == tolower(search)) == !invert) {Matches[length(Matches)+1]=count;}
 		}
 	#
 	# otherwise, perform a regex search
@@ -80,9 +81,8 @@ function db_Search(db,field,search,mode,Matches,		Parts,line,count){
 	} else {
 		while ((getline l < db) > 0) {
 			count++;
-			db_Dissect(l,Parts);
 
-			if (tolower(Parts[field]) ~ tolower(search)) {Matches[length(Matches)+1]=count;}
+			if ((tolower(Parts[field]) ~ tolower(search)) == !invert) {Matches[length(Matches)+1]=count;}
 		}
 	}
 

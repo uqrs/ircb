@@ -33,6 +33,7 @@
 #
 #       -E      use extended regular expressions when searching.
 #	-F      use fixed strings when searching (default).
+#	-v      invert search (show non-matching).
 #
 #       -i        print information on entry
 #     DATABASE CONTENT MODIFICATION
@@ -177,7 +178,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c,C",Options);
+	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c,C,v",Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -295,7 +296,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				#
 				# filter/blacklist out operations that do not apply to `-S`
 				#
-				success=getopt_Uncompatible(Options,"EFif");
+				success=getopt_Uncompatible(Options,"EFifv");
 				if (success==1) {
 					#
 					# incompatible options found; complain
@@ -382,7 +383,7 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	#
 	array(Results);
 	db=dbinterface_Use[$3];
-	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,Results);
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,0,Results);
 
 	#
 	# if success isn't `0`, then no results were found.
@@ -469,7 +470,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	#
 	array(Results);
 	db=dbinterface_Use[$3];
-	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,Results);
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,0,Results);
 
 	if (success==1) {
 		send(							\
@@ -501,7 +502,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	)
 }
 
-function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,maxpage,out,line,use_field) {
+function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,maxpage,out,line,use_field,invert) {
 	if ((Options["--"]=="")) {
 		send(							\
 			sprintf(					\
@@ -593,13 +594,19 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		Options["f"]="contents";
 	}
 
+	if ("v" in Options) { invert=1 }
+	else                { invert=0 };
+	#
+	#
+	#
+
 	#
 	# arguments figured out. Begin searching
 	#
 	array(Results);
 	db=dbinterface_Use[$3];
 	use_field=dbinterface_Field[Options["f"]];
-	success=db_Search(db_Persist[db],use_field,Options["--"],mode,Results);
+	success=db_Search(db_Persist[db],use_field,Options["--"],mode,invert,Results);
 
 	if (success==1) {
 		#
@@ -899,7 +906,7 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 # `dbinterface_Exists()` makes a call to `db_Search()` to see whether an entry with a given
 # label already exists. If it does, it returns `0`. Else, `1`.
 function dbinterface_Exists(db_file,label,Throw) {
-	return db_Search(db_file,1,label,2,Throw);
+	return db_Search(db_file,1,label,2,0,Throw);
 };
 
 #
@@ -927,7 +934,7 @@ function dbinterface_Resolveperms(db,Parts,perm,	effective_rank) {
 #
 # reference: db_Get(db,line)      				[1=err]
 #            db_Dissect(line,Arr) 				[1=less than 7 fields]
-#            db_Search(db,field,search,mode,Matches)		[1=none found]
+#            db_Search(db,field,search,mode,invert,Matches)	[1=none found]
 #            db_Update(db,line,new)				[1=line doesn't exist]
 #            db_Add(db,entry,owner,contents) 
 # dbinterface_Field["label", "perms", "owner", "edited_by", "created", "edited", "contents"];
