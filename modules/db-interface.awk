@@ -713,9 +713,9 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		if (dbinterface_color == 1) {
 			if (mode==0) {
-				match(Parts[use_field],rsan(Options["--"]))
+				match(tolower(Parts[use_field]),tolower(rsan(Options["--"])))
 			} else if (mode==1) {
-				match(Parts[use_field],rsan(Options["--"]))
+				match(tolower(Parts[use_field]),tolower(rsan(Options["--"])))
 			} else {
 				RSTART=1; RLENGTH=length(Parts[use_field]);
 			}
