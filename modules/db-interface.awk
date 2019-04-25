@@ -78,7 +78,6 @@ BEGIN {
 	# the database authority channel is the channel from which e user-modes such
 	# as ~, &, @, %, + etc. are looked up.
 	#
-	
 	#dbinterface_Authority["remember"]="#channel";
 
 	#
@@ -143,18 +142,11 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	#
 	# make sure a database is allocated
 	#
-	if (!($3 in dbinterface_Use)) { 
-		send(						\
-			sprintf(				\
-				dbinterface_Template["no-db"],	\
-				$3,				\
-				"db => query-info",		\
-				$3				\
-			)					\
-		)
-
-		return 2;
-	};
+	if (!($3 in dbinterface_Use)) { send( sprintf( dbinterface_Template["no-db"],	\
+		$3,			\
+		"db => query-info",	\
+		$3			\
+	) ); return -1 }
 
 	#
 	# check to see whether this database has an authority channel
@@ -167,7 +159,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 		secure=1;
 
 		if ( whois_Whois(USER,$0,"db-interface",$3,"(authority for " dbinterface_Use[$3] ": " $3 ")") == 1 ) {
-			return 1;
+			return -2;
 		}
 	}
 	else { secure=0; }
@@ -183,54 +175,39 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	#
 	# if the option-parsing failed, throw an error. 
 	#
-	if (success == 1) {
-		send(										\
-			sprintf(								\
-				dbinterface_Template["opt-err"],				\
-				$3,								\
-				"db => getopt",							\
-				Options[0]							\
-			)									\
-		);
+	if (success == 1) { send( sprintf( dbinterface_Template["opt-err"], \
+		$3,		\
+		"db => getopt",	\
+		Options[0]	\
+	) ); return -3; }
 	#
 	# begin deciphering what we are to do, throwing errors if we
 	# end up with bogus flag arguments/combinations.
 	#
-	} else {
+	else {
 		success=getopt_Either(Options,"QS");
 
-		if (success==1) {
-			#
-			# neither option was found
-			#
-			send(							\
-				sprintf(					\
-					dbinterface_Template["opt-neither"],	\
-					$3,					\
-					"db => getopt",				\
-					"`-Q` or `-S`"				\
-				)						\
-			)
-
-		} else
-		if (success==2) {
-			#
-			# conflicting options were found
-			#
-			send(							\
-				sprintf(					\
-					dbinterface_Template["opt-conflict"],	\
-					$3,					\
-					"db => getopt",				\
-					"-" Options[0],				\
-					"-" Options[-1]				\
-				)						\
-			)
-		} else
-		{
-			#
-			# continue regular execution
-			#
+		#
+		# neither option was found
+		#
+		if (success==1) { send( sprintf( dbinterface_Template["opt-neither"], \
+			$3,		\
+			"db => getopt",	\
+			"`-Q` or `-S`"	\
+		) ); return -4 } 
+		#
+		# conflicting options were found
+		#
+		else if (success==2) { send( sprintf( dbinterface_Template["opt-conflict"], \
+			$3,		\
+			"db => getopt",	\
+			"-" Options[0],	\
+			"-" Options[-1]	\
+		) ); return -5 } 
+		#
+		# continue regular execution
+		#
+		else {
 			if (Options[0] == "Q") {
 			###
 			# PERFORM A QUERY OPERATION (-Q)
@@ -239,51 +216,38 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				# filter/blacklist out operations that do not apply to `-Q`
 				#
 				success=getopt_Uncompatible(Options,"waOTcC");
-				if (success==1) {
-					#
-					# incompatible options found; complain
-					#
-					send(							\
-						sprintf(					\
-							dbinterface_Template["opt-invalid"],	\
-							$3,					\
-							"db => getopt",				\
-							"-" Options[0],				\
-							"-Q"					\
-						)						\
-					);
 
-					return 1;
-				}
+				#
+				# incompatible options found; complain
+				#
+				if (success==1) { send(	sprintf( dbinterface_Template["opt-invalid"], \
+					$3,		\
+					"db => getopt",	\
+					"-" Options[0],	\
+					"-Q"		\
+				) ); return -6 }
 				#
 				# look for one of `-s` or `-i`
 				#
 				success=getopt_Either(Options,"si");
 
+				#
+				# neither search nor info query was performed. Default to
+				# showing the contents of the tell.
+				#
 				if (success == 1) {
-					#
-					# neither search nor info query was performed. Default to
-					# showing the contents of the tell.
-					#
 					dbinterface_Query_show(Options);
 					return 0;
-				} else
-				if (success == 2) {
-					#
-					# a conflict was found. Complain.
-					#
-					send(							\
-						sprintf(					\
-							dbinterface_Template["opt-conflict"],	\
-							$3,					\
-							"db => getopt",				\
-							"-" Options[0],				\
-							"-" Options[-1]				\
-						)						\
-					)
-
-					return 3;
 				}
+				#
+				# a conflict was found. Complain.
+				#
+				else if (success == 2) { send( sprintf(	dbinterface_Template["opt-conflict"], \
+					$3,		\
+					"db => getopt",	\
+					"-" Options[0],	\
+					"-" Options[-1]	\
+				) ); return -7 }
 				#
 				# no more conflicts/bogus flags. We can begin command execution.
 				#
@@ -297,59 +261,40 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				# filter/blacklist out operations that do not apply to `-S`
 				#
 				success=getopt_Uncompatible(Options,"EFifv");
-				if (success==1) {
-					#
-					# incompatible options found; complain
-					#
-					send(							\
-						sprintf(					\
-							dbinterface_Template["opt-invalid"],	\
-							$3,					\
-							"db => getopt",				\
-							"-" Options[0],				\
-							"-S"					\
-						)						\
-					);
 
-					return 1;
-				}
+				#
+				# incompatible options found; complain
+				#
+				if (success==1) { send( sprintf( dbinterface_Template["opt-invalid"], \
+					$3,					\
+					"db => getopt",				\
+					"-" Options[0],				\
+					"-S"					\
+				) ); return -8 }
 				#
 				# look for one of `-w`, `-a`, `-r`, or `-p`
 				#
 				success=getopt_Either(Options,"warp");
 
-				if (success == 1) {
-					#
-					# none of these were speficied. Complain.
-					#
-					send(							\
-						sprintf(					\
-							dbinterface_Template["opt-neither-c"],	\
-							$3,					\
-							"db => getopt",				\
-							"`-w`, `-a`, `-r`, or `-p`",		\
-							"-S"					\
-						)						\
-					)
 
-					return 2;
-				} else
-				if (success == 2) {
-					#
-					# a conflict was found. Complain.
-					#
-					send(							\
-						sprintf(					\
-							dbinterface_Template["opt-conflict"],	\
-							$3,					\
-							"db => getopt",				\
-							"-" Options[0],				\
-							"-" Options[-1]				\
-						)						\
-					)
-
-					return 3;
-				}
+				#
+				# none of these were speficied. Complain.
+				#
+				if (success == 1) { send( sprintf( dbinterface_Template["opt-neither-c"], \
+					$3,				\
+					"db => getopt",			\
+					"`-w`, `-a`, `-r`, or `-p`",	\
+					"-S"				\
+				) ); return -9 }
+				#
+				# a conflict was found. Complain.
+				#
+				else if (success == 2) { send( sprintf( dbinterface_Template["opt-conflict"], \
+					$3,		\
+					"db => getopt",	\
+					"-" Options[0],	\
+					"-" Options[-1]	\
+				) ); return -10 }
 				#
 				# no more conflicts. 
 				#
@@ -367,17 +312,10 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	#
 	# ensure the user actually specified an argument
 	#
-	if (Options["--"] == "") {
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-ns-entry"],	\
-				$3,					\
-				"db => query-info"			\
-			)						\
-		)
-
-		return 1;
-	}
+	if (Options["--"] == "") { send( sprintf( dbinterface_Template["opt-ns-entry"],	\
+		$3,			\
+		"db => query-info"	\
+	) ); return -1 }
 	#
 	# perform the search
 	#
@@ -388,82 +326,60 @@ function dbinterface_Query_info(Options,		Results,Parts,line,db,success,created_
 	#
 	# if success isn't `0`, then no results were found.
 	#
-	if (success==1) {
-		send(							\
-			sprintf(					\
-				dbinterface_Template["query-not-found"],\
-				$3,					\
-				"db => query-info",			\
-				Options["--"],				\
-				db					\
-			)						\
-		)
+	if (success==1) { send( sprintf( dbinterface_Template["query-not-found"], \
+				$3,			\
+				"db => query-info",	\
+				Options["--"],		\
+				db			\
+	) ); return -2 }
+	#
+	# continue regular execution
+	#
+	array(Parts);
+	line=db_Get(db_Persist[db],Results[1]);
+	db_Dissect(line,Parts);
 
-		return 3;
-	} else {
+	#
+	# if security for this channel is enabled, check permissions.
+	#
+	if (db in dbinterface_Authority) {
+		success=dbinterface_Resolveperms(db,Parts,"r");
+
 		#
-		# display found result.
+		# user is not permitted to read.
 		#
-		array(Parts);
-		line=db_Get(db_Persist[db],Results[1]);
-		db_Dissect(line,Parts);
-
-		#
-		# if security for this channel is enabled, check permissions.
-		#
-		if (db in dbinterface_Authority) {
-			success=dbinterface_Resolveperms(db,Parts,"r");
-			if ( success == 1 ) {
-				#
-				# user is not permitted to read.
-				#
-				send(										\
-					sprintf(								\
-						dbinterface_Template["perm-no-read"],				\
-						$3,								\
-						"db => query-info",						\
-						USER,								\
-						Options["--"],							\
-						modesec_Lookup[dbinterface_Authority[db] " " USER],		\
-						Parts[dbinterface_Field["perms"]]				\
-					)									\
-				)
-
-				return 4;
-			}
-		}
-
-		created_at=sys("date -d '@" Parts[5] "'");
-		modified_at=sys("date -d '@" Parts[6] "'");
-		send(							\
-			sprintf(					\
-				dbinterface_Template["query-info"],	\
-				$3,					\
-				"db => query-info",			\
-				Parts[1],				\
-				db,					\
-				Parts[3],				\
-				Parts[4],				\
-				created_at,				\
-				modified_at,				\
-				Parts[2]				\
-			)						\
-		)
-
+		if ( success == 1 ) { send( sprintf( dbinterface_Template["perm-no-read"], \
+			$3,							\
+			"db => query-info",					\
+			USER,							\
+			Options["--"],						\
+			modesec_Lookup[dbinterface_Authority[db] " " USER],	\
+			Parts[dbinterface_Field["perms"]]			\
+		) ); return -3 }
 	}
+
+	created_at=sys("date -d '@" Parts[5] "'");
+	modified_at=sys("date -d '@" Parts[6] "'");
+	send( sprintf( dbinterface_Template["query-info"], \
+		$3,			\
+		"db => query-info",	\
+		Parts[1],		\
+		db,			\
+		Parts[3],		\
+		Parts[4],		\
+		created_at,		\
+		modified_at,		\
+		Parts[2]		\
+	) );
+
+	return 0;
 }
 
 function dbinterface_Query_show(Options,	Parts,Results,line,success) {
-	if ((Options["--"]=="")) {
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-ns-entry"],	\
-				$3,					\
-				"db => query-show"			\
-			)						\
-		)
-		return 1;
-	}
+	if ((Options["--"]=="")) { send( sprintf( dbinterface_Template["opt-ns-entry"], \
+		$3,			\
+		"db => query-show"	\
+	) ); return -1 }
 
 	#
 	# perform a search for the given database entry
@@ -472,124 +388,110 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	db=dbinterface_Use[$3];
 	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,0,Results);
 
-	if (success==1) {
-		send(							\
-			sprintf(					\
-				dbinterface_Template["query-not-found"],\
-				$3,					\
-				"db => query-show",			\
-				Options["--"],				\
-				db					\
-			)						\
-		)
-		return 2;
-	}
+	#
+	# no results found...
+	#
+	if (success==1) { send( sprintf( dbinterface_Template["query-not-found"], \
+				$3,			\
+				"db => query-show",	\
+				Options["--"],		\
+				db			\
+	) ); return -2 }
 
 	#
-	# get the actual line itself and display it.
-	#
+	# get the line in question
+	# 
 	line=db_Get(db_Persist[db],Results[1]);
 	db_Dissect(line,Parts);
 
-	send(								\
-		sprintf(						\
-			dbinterface_Template["query-show"],		\
-			$3,						\
-			"db => query-show",				\
-			Parts[1],					\
-			Parts[7]					\
-		)							\
-	)
+	#
+	# if security for this channel is enabled, check permissions.
+	#
+	if (db in dbinterface_Authority) {
+		success=dbinterface_Resolveperms(db,Parts,"r");
+		#
+		# user is not permitted to read.
+		#
+		if ( success == 1 ) { send( sprintf( dbinterface_Template["perm-no-read"], 	\
+			$3,							\
+			"db => query-search",					\
+			USER,							\
+			Parts[dbinterface_Field["label"]],			\
+			modesec_Lookup[dbinterface_Authority[db] " " USER],	\
+			Parts[dbinterface_Field["perms"]]			\
+		) ); return -3 }
+	}
+
+	#
+	# actually display it
+	#
+	send( sprintf( dbinterface_Template["query-show"], \
+		$3,			\
+		"db => query-show",	\
+		Parts[1],		\
+		Parts[7]		\
+	) );
+
+	return 0;
 }
 
 function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,maxpage,out,line,use_field,invert) {
-	if ((Options["--"]=="")) {
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-no-query"],	\
-				$3,					\
-				"db => query-search"			\
-			)						\
-		)
-
-		return 1;
-	}
+	if ((Options["--"]=="")) { send( sprintf( dbinterface_Template["opt-no-query"], \
+		$3,			\
+		"db => query-search"	\
+	) ); return -1 }
 
 	#
 	# see if we have either `-E` or `-F`
 	#
 	success=getopt_Either(Options,"EF");
 
-	if (success==2) {
-		#
-		# both flags were specified, complain.
-		#
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-conflict"],	\
-				$3,					\
-				"db => query-search",			\
-				"-" Options[0],				\
-				"-" Options[-1]				\
-			)						\
-		)
-
-		return 2;	
-	}
+	#
+	# both flags were specified, complain.
+	#
+	if (success==2) { send( sprintf( dbinterface_Template["opt-conflict"], \
+		$3,			\
+		"db => query-search",	\
+		"-" Options[0],		\
+		"-" Options[-1]		\
+	) ); return -2 }
 
 	if (Options[0] == "E")  {mode=1}
 	else                    {mode=0};
 
 	success=getopt_Either(Options,"pr");
 
-	if (success==2) {
-		#
-		# both flags were specified, complain.
-		#
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-conflict"],	\
-				$3,					\
-				"db => query-search",			\
-				"-" Options[0],				\
-				"-" Options[-1]				\
-			)						\
-		)
-
-		return 3;
-	} else if (success==1) {
+	#
+	# both flags were specified, complain.
+	#
+	if (success==2) { send( sprintf( dbinterface_Template["opt-conflict"], \
+		$3,			\
+		"db => query-search",	\
+		"-" Options[0],		\
+		"-" Options[-1]		\
+	) ); return -3 }
+	#
+	# otherwise, default to `-p 1`
+	#
+	else if (success==1) {
 		Options["p"]=1;
 		Options[0]="p";
 	}
 
-	if (Options[Options[0]]=="") {
-		#
-		# no argument for page-result was specified. Complain.
-		#
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-noarg"],	\
-				$3,					\
-				"db => query-search",			\
-				Options[0]				\
-			)						\
-		)
-
-		return 4;
-	}
+	#
+	# no argument for page-result was specified. Complain.
+	#
+	if (Options[Options[0]]=="") { send( sprintf( dbinterface_Template["opt-noarg"], \
+		$3,			\
+		"db => query-search",	\
+		Options[0]		\
+	) ); return -4 }
 
 	if ("f" in Options) {
-		if (!(Options["f"] in dbinterface_Field)) {
-			send(							\
-				sprintf(					\
-					dbinterface_Template["opt-bogus-field"],\
-					$3,					\
-					"db => query-search"			\
-				)						\
-			)
-
-			return 5;
-		} 
+		if (!(Options["f"] in dbinterface_Field)) { send( sprintf( dbinterface_Template["opt-bogus-field"], \
+			$3,			\
+			"db => query-search"	\
+		) ); return -5 }
 	} else {
 		Options["f"]="contents";
 	}
@@ -608,22 +510,15 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 	use_field=dbinterface_Field[Options["f"]];
 	success=db_Search(db_Persist[db],use_field,Options["--"],mode,invert,Results);
 
-	if (success==1) {
-		#
-		# no results found. complain.
-		#
-		send(								\
-			sprintf(						\
-				dbinterface_Template["query-no-results"],	\
-				$3,						\
-				"db => query-search",				\
-				Options["--"],					\
-				db						\
-			)							\
-		)
-
-		return 5;
-	}
+	#
+	# no results found. complain.
+	#
+	if (success==1) { send( sprintf( dbinterface_Template["query-no-results"], \
+		$3,			\
+		"db => query-search",	\
+		Options["--"],		\
+		db			\
+	) ); return -6 }
 
 	if (Options[0]=="p") {
 		#
@@ -652,17 +547,14 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		}
 
 		sub(/, $/,"",out)
-		send(								\
-			sprintf(						\
-				dbinterface_Template["query-search-page"],	\
-				$3,						\
-				"db => query-search",				\
-				page,						\
-				maxpage,					\
-				out						\
-			)							\
-		)
-	} else {
+		send( sprintf( dbinterface_Template["query-search-page"], \
+			$3,			\
+			"db => query-search",	\
+			page,			\
+			maxpage,		\
+			out			\
+		) ); return 0 }
+	else {
 		#
 		# `-r` specified; show result number `n`.
 		#
@@ -687,24 +579,17 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 		#
 		if (db in dbinterface_Authority) {
 			success=dbinterface_Resolveperms(db,Parts,"r");
-			if ( success == 1 ) {
-				#
-				# user is not permitted to read.
-				#
-				send(										\
-					sprintf(								\
-						dbinterface_Template["perm-no-read"],				\
-						$3,								\
-						"db => query-search",						\
-						USER,								\
-						Parts[dbinterface_Field["label"]],				\
-						modesec_Lookup[dbinterface_Authority[db] " " USER],		\
-						Parts[dbinterface_Field["perms"]]				\
-					)									\
-				)
-
-				return 6;
-			}
+			#
+			# user is not permitted to read.
+			#
+			if ( success == 1 ) { send( sprintf( dbinterface_Template["perm-no-read"], 	\
+						$3,							\
+						"db => query-search",					\
+						USER,							\
+						Parts[dbinterface_Field["label"]],			\
+						modesec_Lookup[dbinterface_Authority[db] " " USER],	\
+						Parts[dbinterface_Field["perms"]]			\
+			) ); return -7 }
 		}
 
 		#
@@ -731,17 +616,14 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 			);
 		}
 
-		send(								\
-			sprintf(						\
-				dbinterface_Template["query-search-show"],	\
-				$3,						\
-				"db => query-show",				\
-				result,						\
-				length(Results),				\
-				Parts[1],					\
-				Parts[7]					\
-			)							\
-		)
+		send( sprintf( dbinterface_Template["query-search-show"], \
+			$3,			\
+			"db => query-show",	\
+			result,			\
+			length(Results),	\
+			Parts[1],		\
+			Parts[7]		\
+		) ); return 0
 	}
 }
 
@@ -751,35 +633,20 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 	else if ("r" in Options) {what="r";op="replace"}
 	else if ("p" in Options) {what="p";op="prepend"}
 
-	if ((Options[what]=="")) {
-		#
-		# no label specified to write to
-		#
-		send(							\
-			sprintf(					\
-			     dbinterface_Template["opt-write-entry"],	\
-			     $3,					\
-			     "db => sync-" op				\
-			)						\
-		);
-
-		return 1;
-	}
-	if ((Options["--"] == "")) {
-		#
-		# no write content specified. Complain.
-		#
-		send(							\
-			sprintf(					\
-				dbinterface_Template["opt-no-write"],	\
-				$3,					\
-				"db => sync-" op			\
-			)						\
-		)
-
-		return 2;
-	};
-
+	#
+	# no label specified to write to
+	#
+	if ((Options[what]=="")) { send( sprintf( dbinterface_Template["opt-write-entry"], \
+		$3,		\
+		"db => sync-" op	\
+	) ); return -1 }
+	#
+	# no write content specified. Complain.
+	#
+	else if ((Options["--"] == "")) { send( sprintf( dbinterface_Template["opt-no-write"], \
+		$3,			\
+		"db => sync-" op	\
+	) ); return -2 }
 	#
 	# attempt a search to see if an entry with this label already exists.
 	# call the appropriate function.
@@ -805,24 +672,17 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		#
 		if (db in dbinterface_Authority) {
 			success=dbinterface_Resolveperms(db,Parts,"w");
-			if ( success == 1 ) {
-				#
-				# user is not permitted to write.
-				#
-				send(										\
-					sprintf(								\
-						dbinterface_Template["perm-no-write"],				\
-						$3,								\
-						"db => sync-update/" op,					\
-						USER,								\
-						Parts[dbinterface_Field["label"]],				\
-						modesec_Lookup[dbinterface_Authority[db] " " USER],		\
-						Parts[dbinterface_Field["perms"]]				\
-					)									\
-				)
-
-				return 3;
-			}
+			#
+			# user is not permitted to write.
+			#
+			if ( success == 1 ) { send( sprintf( dbinterface_Template["perm-no-write"], \
+				$3,							\
+				"db => sync-update/" op,				\
+				USER,							\
+				Parts[dbinterface_Field["label"]],			\
+				modesec_Lookup[dbinterface_Authority[db] " " USER],	\
+				Parts[dbinterface_Field["perms"]]			\
+			) ); return -3 }
 		}
 		if      ( what == "w" ) {Parts[dbinterface_Field["contents"]]=Options["--"]}
 		else if ( what == "a" ) {Parts[dbinterface_Field["contents"]]=Parts[dbinterface_Field["contents"]] " " Options["--"]}
@@ -834,16 +694,13 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 			sep=substr(Options["--"],2,1);
 			split(Options["--"],Sub,sep);
 
-			if ( (Options["--"] !~ /^s./) || (length(Sub) != 4)) {
-				send(								\
-					sprintf(						\
-						dbinterface_Template["substitute-usage"],	\
-						$3,						\
-						"db => sync-update/" op				\
-					)							\
-				)
-				return 1;
-			}
+			#
+			# invalid usage of `s/`, lecture the user.
+			#
+			if ( (Options["--"] !~ /^s./) || (length(Sub) != 4)) { send( sprintf( dbinterface_Template["substitute-usage"], \
+				$3,			\
+				"db => sync-update/" op	\
+			) ); return -4 }
 
 			gsub(Sub[2],Sub[3],Parts[dbinterface_Field["contents"]]);
 
@@ -852,18 +709,15 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		gsub(/ +/," ",Parts[dbinterface_Field["contents"]]);
 		db_Update(db_Persist[db],Current[1],acut(Parts,1,7,"\x1E"));
 
-		send(							\
-			sprintf(					\
-				dbinterface_Template["update-success"],	\
-				$3,					\
-				"db => sync-update/" op,		\
-				Parts[dbinterface_Field["label"]],	\
-				Parts[dbinterface_Field["owner"]],	\
-				USER,					\
-				Parts[dbinterface_Field["perms"]],	\
-				date					\
-			)						\
-		)
+		send( sprintf( dbinterface_Template["update-success"], \
+			$3,					\
+			"db => sync-update/" op,		\
+			Parts[dbinterface_Field["label"]],	\
+			Parts[dbinterface_Field["owner"]],	\
+			USER,					\
+			Parts[dbinterface_Field["perms"]],	\
+			date					\
+		) );
 	} else {
 		#
 		# entry doesn't exist. Write a new one.
@@ -882,18 +736,15 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		# TODO: actually do something with `success`.
 		success=db_Add(db_Persist[db],new);
 
-		send(							\
-			sprintf(					\
-				dbinterface_Template["write-success"],	\
-				$3,					\
-				"db => sync-write",	 		\
-				Options[what],				\
-				USER,					\
-				USER,					\
-				dbinterface_Mask[db],			\
-				date					\
-			)						\
-		)
+		send( sprintf( dbinterface_Template["write-success"], \
+				$3,			\
+				"db => sync-write",	\
+				Options[what],		\
+				USER,			\
+				USER,			\
+				dbinterface_Mask[db],	\
+				date			\
+		) );
 	}
 }
 
@@ -931,15 +782,6 @@ function dbinterface_Resolveperms(db,Parts,perm,	effective_rank) {
 	allocated_perms=substr(Parts[dbinterface_Field["perms"]],(modesec_Ranks[effective_rank] * 3)+1,3);
 	return (!(allocated_perms ~ perm));
 }
-#
-# reference: db_Get(db,line)      				[1=err]
-#            db_Dissect(line,Arr) 				[1=less than 7 fields]
-#            db_Search(db,field,search,mode,invert,Matches)	[1=none found]
-#            db_Update(db,line,new)				[1=line doesn't exist]
-#            db_Add(db,entry,owner,contents) 
-# dbinterface_Field["label", "perms", "owner", "edited_by", "created", "edited", "contents"];
-#           1        2        3        4            5          6         7
-#
 
 ($2 == "PRIVMSG") && ($4 ~ /^::db$/) {
 	dbinterface_Db($0);
