@@ -16,8 +16,9 @@ BEGIN {
 	# the modesec_Ranks array contains key-value pairs denoting numerical
 	# representation of various ranks. This way, to tell whether user A's rank
 	# is higher than user B's rank, one can do `modesec_Rank[a_rank] < modesec_Rank[b_rank]`
+	# `n` stands in for "no rank"
 	#
-	modesec_Ranks[" "]=5;
+	modesec_Ranks["n"]=5;
 	modesec_Ranks["+"]=4;
 	modesec_Ranks["%"]=3;
 	modesec_Ranks["@"]=2;
@@ -43,7 +44,10 @@ function modesec_Stage(		Individuals,namestring) {
 		if ( Individuals[i] ~ /^[~&@%+]/ ) {
 			modesec_Temp[$5 " " substr(Individuals[i],2)]=substr(Individuals[i],1,1);
 		} else {
-			modesec_Temp[$5 " " Individuals[i]]=" ";
+			#
+			# "n" stands in for "no rank"
+			#
+			modesec_Temp[$5 " " Individuals[i]]="n";
 		}
 	}
 }
