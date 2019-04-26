@@ -36,15 +36,12 @@
 #	-v      invert search (show non-matching).
 #
 #       -i        print information on entry
-#     DATABASE CONTENT MODIFICATION
+#     DATABASE CONTENT MODIFICATION (use with -S)
 #       -w        overwrite entry
 #       -a        append to entry
 #       -p        prepend to entry
 #       -s        perform a find-and-replace on entry
-#     DATABASE CONTENT MODIFICATION EXTRA (use with -Sw, -Sa, -Sp, -Ss)
-#       -O        overwrite database owner
-#       -T        overwrite creation date
-#     DATABASE META MODIFICATION
+#     DATABASE META MODIFICATION (use with -S)
 #       -c        change permissions for entry
 #       -C        change ownership of entry
 #
@@ -55,6 +52,10 @@
 #  security features are automatically enabled for a database if this database
 #  has an authority channel assigned to it in the `dbinterface_Authority` array. 
 #
+# TODO
+#   - Standardise error codes; make it so that each function returns a given error code for similar issues.
+#     e.g. a "no such entry exist" code will always be -2, etc.
+#   - Clean the getopt parsing up even more and find some kind of structure for error-message printing.
 BEGIN {
 	#
 	# databases are flat files that store actual information.
@@ -115,6 +116,8 @@ BEGIN {
 	dbinterface_Template["opt-bogus-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
 	dbinterface_Template["opt-no-write"]   ="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
 	dbinterface_Template["opt-write-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
+	dbinterface_Template["opt-chmod-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to work on.";
+	dbinterface_Template["opt-no-perms"]   ="PRIVMSG %s :[%s] fatal: must specify new permission strings.";
 	#
 	# non-error results
 	#
@@ -126,12 +129,15 @@ BEGIN {
 	dbinterface_Template["query-search-page"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
 	dbinterface_Template["write-success"]    ="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
 	dbinterface_Template["update-success"]   ="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
-	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`"
+	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`";
+	dbinterface_Template["chmod-usage"]      ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]:[r-][w-][x-][ [~&@%%+n]:[r-][w-][x-] [...]]`";
+	dbinterface_Template["chmod-success"]    ="PRIVMSG %s :[%s] Successfully modified permissions for entry `%s` (now: %s)";
 	#
 	# denied permissions
 	#
 	dbinterface_Template["perm-no-read"]     ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to read entry `%s` (%s:%s)";
 	dbinterface_Template["perm-no-write"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify entry `%s` (%s:%s)";
+	dbinterface_Template["perm-no-chmod"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify permissions for rank `%s` for entry `%s` (%s > %s)";
 }
 
 #
@@ -170,7 +176,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c,C,v",Options);
+	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c:,C:,v",Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -274,17 +280,16 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				#
 				# look for one of `-w`, `-a`, `-r`, or `-p`
 				#
-				success=getopt_Either(Options,"warp");
-
+				success=getopt_Either(Options,"warpcC");
 
 				#
 				# none of these were speficied. Complain.
 				#
 				if (success == 1) { send( sprintf( dbinterface_Template["opt-neither-c"], \
-					$3,				\
-					"db => getopt",			\
-					"`-w`, `-a`, `-r`, or `-p`",	\
-					"-S"				\
+					$3,					\
+					"db => getopt",				\
+					"`-w`, `-a`, `-r`, `-p`, `-c` or `-C`",	\
+					"-S"					\
 				) ); return -9 }
 				#
 				# a conflict was found. Complain.
@@ -298,7 +303,8 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				#
 				# no more conflicts. 
 				#
-				dbinterface_Sync_write(Options);
+				if ( "c" in Options ) { dbinterface_Sync_chmod(Options) }
+				else                  { dbinterface_Sync_write(Options) }
 			}
 		}
 	}
@@ -748,6 +754,114 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 	}
 }
 
+function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,results,success,db,use_field,line,Parts,perms) {
+	#
+	# no label specified to work on.
+	#
+	if ((Options["c"]=="")) { send( sprintf( dbinterface_Template["opt-chmod-entry"], \
+		$3,		\
+		"db => chmod"	\
+	) ); return -1 }
+	#
+	# no write content specified. Complain.
+	#
+	else if ((Options["--"] == "")) { send( sprintf( dbinterface_Template["opt-no-perms"], \
+		$3,		\
+		"db => chmod"	\
+	) ); return -2 }
+
+	#
+	# lookup the entry in question and throw errors if needed:
+	#
+	array(Results);
+	db=dbinterface_Use[$3];
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["c"],2,0,Results);
+
+	if ( success == 1 ) { send( sprintf( dbinterface_Template["query-not-found"], \
+		$3,		\
+		"db => chmod",	\
+		Options["c"],	\
+		db		\
+	) ); return -5 }
+	#
+	# the stdopt arg must be a sequence of characters in the form of:
+	#  R:[r-][w-][x-][\x20R2:[r-][w-][x-] [...]
+	# where `R` corresponds to one of the ranks found in `modesec_Ranks`
+	#
+	array(Modstring);
+	split(Options["--"],Modstrings);
+
+	#
+	# check to see that the user hasn't butchered the syntax and check
+	# to see whether the user is allowed to modify the permissions at all
+	# (may only modify permissions below their own rank).
+	#
+	# note that the `n = ~ if user is owner` substitution is not made.
+	#
+
+	#
+	# store the caller's effective rank for cross-referencing
+	#
+	effective_rank=modesec_Lookup[dbinterface_Authority[db] " " USER];
+
+	#
+	# this loop intends to catch syntax errors and illegal modifications
+	#
+	for ( i in Modstrings ) {
+		#
+		# check syntax:
+		#
+		if ( Modstrings[i] !~ /^[~&@%\+n]:[r\-][w\-][x\-]$/ ) { send( sprintf( dbinterface_Template["chmod-usage"], \
+			$3,		\
+			"db => chmod"	\
+		) ); return -3 }
+
+		#
+		# check whether user is permitted to modify:
+		#
+		if ( modesec_Ranks[substr(Modstrings[i],1,1)] < modesec_Ranks[effective_rank] ) { send( sprintf( dbinterface_Template["perm-no-chmod"], \
+			$3,				\
+			"db => chmod",			\
+			USER,				\
+			substr(Modstrings[i],1,1),	\
+			Options["c"],			\
+			substr(Modstrings[i],1,1),	\
+			effective_rank			\
+		) ); return -4 }
+	}
+
+	#
+	# begin retrieving the line and apply changes to the
+	# permissions string.
+	#
+	line=db_Get(db_Persist[db],Results[1]);
+	db_Dissect(line,Parts);
+
+	for ( i in Modstrings ) {
+		split(Modstrings[i],Modparts,":");
+
+		perms=Parts[dbinterface_Field["perms"]];
+		Parts[dbinterface_Field["perms"]]=(				\
+			substr(perms,1,modesec_Ranks[Modparts[1]]*3)		\
+			Modparts[2]						\
+			substr(perms,(modesec_Ranks[Modparts[1]]+1)*3+1)	\
+		)
+	}
+
+	#
+	# perform a database update to apply new permissions.
+	#
+	db_Update(db_Persist[db],Results[1],acut(Parts,1,7,"\x1E"));
+
+	send( sprintf( dbinterface_Template["chmod-success"], \
+		$3,					\
+		"db => chmod",				\
+		Options["c"],				\
+		Parts[dbinterface_Field["perms"]]	\
+	) );
+
+	return 0;
+}
 #
 # The way all write operations performed by dbinterface are performed occurs like this:
 #	dbinterface_Exists() checks to see whether an entry with label `l` already exists.
