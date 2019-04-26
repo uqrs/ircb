@@ -39,8 +39,8 @@
 #     DATABASE CONTENT MODIFICATION (use with -S)
 #       -w        overwrite entry
 #       -a        append to entry
+#       -r        perform a find-and-replace on entry
 #       -p        prepend to entry
-#       -s        perform a find-and-replace on entry
 #     DATABASE META MODIFICATION (use with -S)
 #       -c        change permissions for entry
 #       -C        change ownership of entry
