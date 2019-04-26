@@ -42,7 +42,7 @@ function db_Dissect(line,Arr){
 # it populates the given array `Matches` with line numbers.
 #
 # `mode` may be 0 for a regular word-search, 1 for a regex search, or 2 for exact-matching.
-# `invert` may be 0 for a non-matching, or 1 for matching.
+# `invert` may be 1 for non-matching, or 0 for matching.
 #
 # returns: `0` if at least one match was found
 #          `1` if none were found
