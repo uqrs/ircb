@@ -23,6 +23,7 @@
 # FLAGS (GENERAL)
 #     -Q      perform a database query (default: show entry)
 #     -S      perform a database update
+#     -R      perform a deletion
 #   DATABASE QUERY OPTIONS (use with -Q)
 #       -s      perform a database-search.
 #
@@ -110,20 +111,21 @@ BEGIN {
 	#
 	# errors for invalid options
 	#
-	dbinterface_Template["opt-err"]        ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
-	dbinterface_Template["opt-conflict"]   ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
-	dbinterface_Template["opt-neither"]    ="PRIVMSG %s :[%s] fatal: one of %s is required.";
-	dbinterface_Template["opt-neither-c"]  ="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
-	dbinterface_Template["opt-invalid"]    ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
-	dbinterface_Template["opt-ns-entry"]   ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
-	dbinterface_Template["opt-noarg"]      ="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
-	dbinterface_Template["opt-no-query"]   ="PRIVMSG %s :[%s] fatal: no search query specified.";
-	dbinterface_Template["opt-bogus-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
-	dbinterface_Template["opt-no-write"]   ="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
-	dbinterface_Template["opt-write-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
-	dbinterface_Template["opt-work-entry"] ="PRIVMSG %s :[%s] fatal: no entry specified to work on.";
-	dbinterface_Template["opt-no-perms"]   ="PRIVMSG %s :[%s] fatal: must specify new permission strings.";
-	dbinterface_Template["opt-no-owner"]   ="PRIVMSG %s :[%s] fatal: must specify a new owner.";
+	dbinterface_Template["opt-err"]         ="PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]";
+	dbinterface_Template["opt-conflict"]    ="PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` specified.";
+	dbinterface_Template["opt-neither"]     ="PRIVMSG %s :[%s] fatal: one of %s is required.";
+	dbinterface_Template["opt-neither-c"]   ="PRIVMSG %s :[%s] fatal: one of %s is required in conjunction with `%s`.";
+	dbinterface_Template["opt-invalid"]     ="PRIVMSG %s :[%s] fatal: invalid operation: `%s` does not apply to `%s`.";
+	dbinterface_Template["opt-ns-entry"]    ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
+	dbinterface_Template["opt-noarg"]       ="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
+	dbinterface_Template["opt-no-query"]    ="PRIVMSG %s :[%s] fatal: no search query specified.";
+	dbinterface_Template["opt-bogus-field"] ="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
+	dbinterface_Template["opt-no-write"]    ="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
+	dbinterface_Template["opt-write-entry"] ="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
+	dbinterface_Template["opt-work-entry"]  ="PRIVMSG %s :[%s] fatal: no entry specified to work on.";
+	dbinterface_Template["opt-remove-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to remove.";
+	dbinterface_Template["opt-no-perms"]    ="PRIVMSG %s :[%s] fatal: must specify new permission strings.";
+	dbinterface_Template["opt-no-owner"]    ="PRIVMSG %s :[%s] fatal: must specify a new owner.";
 
 	#
 	# non-error results
@@ -139,7 +141,8 @@ BEGIN {
 	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`";
 	dbinterface_Template["chmod-usage"]      ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]:[r-][w-][x-][ [~&@%%+n]:[r-][w-][x-] [...]]`";
 	dbinterface_Template["chmod-success"]    ="PRIVMSG %s :[%s] Successfully modified permissions for entry `%s` (now: %s)";
-	dbinterface_Template["chown-success"]    ="PRIVMSG %s :[%s] Successfully transferred ownership of entry `%s` to `%s`."
+	dbinterface_Template["chown-success"]    ="PRIVMSG %s :[%s] Successfully transferred ownership of entry `%s` to `%s`.";
+	dbinterface_Template["remove-success"]   ="PRIVMSG %s :[%s] Successfully removed entry `%s` from `%s`.";
 	#
 	# denied permissions
 	#
@@ -147,6 +150,7 @@ BEGIN {
 	dbinterface_Template["perm-no-write"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify entry `%s` (%s:%s)";
 	dbinterface_Template["perm-no-chmod"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify permissions for rank `%s` for entry `%s` (%s > %s)";
 	dbinterface_Template["perm-no-chown"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to transfer ownership of entry `%s`."
+	dbinterface_Template["perm-no-remove"]   ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to remove entry `%s`."
 }
 
 #
@@ -185,7 +189,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt(argstring,"Q,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c:,C:,v",Options);
+	success=getopt_Getopt(argstring,"Q,R,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c:,C:,v",Options);
 
 	#
 	# if the option-parsing failed, throw an error. 
@@ -200,16 +204,16 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 	# end up with bogus flag arguments/combinations.
 	#
 	else {
-		success=getopt_Either(Options,"QS");
+		success=getopt_Either(Options,"QRS");
 
 		#
 		# neither option was found
 		#
 		if (success==1) { send( sprintf( dbinterface_Template["opt-neither"], \
-			$3,		\
-			"db => getopt",	\
-			"`-Q` or `-S`"	\
-		) ); return -4 } 
+			$3,			\
+			"db => getopt",		\
+			"`-Q`, `-R` or `-S`"	\
+		) ); return -4 }
 		#
 		# conflicting options were found
 		#
@@ -268,6 +272,26 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				#
 				if (Options[0] == "s")  { dbinterface_Query_search(Options) }
 				else                    { dbinterface_Query_info(Options)   };
+			} else if (Options[0] == "R" ) {
+			###
+			# PERFORM A DELETION OPERATION (-R)
+			###
+				#
+				# all other options are disallowed.
+				#
+				success=getopt_Uncompatible(Options,"QSsprfEFviwarpcC");
+
+				#
+				# incompatible options found; complain
+				#
+				if (success==1) { send(	sprintf( dbinterface_Template["opt-invalid"], \
+					$3,		\
+					"db => getopt",	\
+					"-" Options[0],	\
+					"-R"		\
+				) ); return -6 }
+
+				dbinterface_Remove(Options);
 			} else {
 			###
 			# PERFORM A SYNC OPERATION (-S)
@@ -285,7 +309,7 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 					"db => getopt",				\
 					"-" Options[0],				\
 					"-S"					\
-				) ); return -8 }
+				) ); return -6 }
 				#
 				# look for one of `-w`, `-a`, `-r`, or `-p`
 				#
@@ -877,7 +901,7 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 	return 0;
 }
 
-function dbinterface_Sync_chown(Options,	Results,db,Parts) {
+function dbinterface_Sync_chown(Options,	Results,db,Parts,line,success) {
 	#
 	# no label specified to work on.
 	#
@@ -931,6 +955,56 @@ function dbinterface_Sync_chown(Options,	Results,db,Parts) {
 		"db => chmod",				\
 		Options["C"],				\
 		Parts[dbinterface_Field["owner"]]	\
+	) );
+
+	return 0;
+}
+
+function dbinterface_Remove(Options,	Results,db,success,line) {
+	#
+	# no label specified to remove.
+	#
+	if ((Options["--"]=="")) { send( sprintf( dbinterface_Template["opt-remove-entry"], \
+		$3,		\
+		"db => remove"	\
+	) ); return -1 }
+
+	#
+	# lookup the entry in question and throw errors if needed:
+	#
+	array(Results);
+	db=dbinterface_Use[$3];
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["--"],2,0,Results);
+
+	if ( success == 1 ) { send( sprintf( dbinterface_Template["query-not-found"], \
+		$3,		\
+		"db => remove",	\
+		Options["--"],	\
+		db		\
+	) ); return -3 }
+	#
+	# check to see whether the caller in question is the owner of this entry
+	#
+	line=db_Get(db_Persist[db],Results[1]);
+	db_Dissect(line,Parts);
+
+	if ( USER != Parts[dbinterface_Field["owner"]] ) { send( sprintf( dbinterface_Template["perm-no-remove"], \
+		$3,		\
+		"db => remove",	\
+		USER,		\
+		Options["--"]	\
+	) ); return -4 }
+
+	#
+	# If all is well, remove the entry:
+	#
+	db_Remove(db_Persist[db],Results[1]);
+
+	send( sprintf( dbinterface_Template["remove-success"],	\
+		$3,		\
+		"db => remove",	\
+		Options["--"],	\
+		db		\
 	) );
 
 	return 0;
