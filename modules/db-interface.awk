@@ -84,7 +84,12 @@ BEGIN {
 	#
 	# `dbinterface_Mask` specifies the default permissions for a newly allocated entry.
 	#
-	dbinterface_Mask["remember"]="rw-rw-rw-r--r--r--";
+	#dbinterface_Mask["remember"]="rw-rw-rw-r--r--r--";
+
+	#
+	# default mask to be falled back upon should none be allocated
+	#
+	dbinterface_Defaultmask="rw-rw-rw-rw-r-xr-x";
 	
 	#
 	# reference table for fields 
@@ -116,8 +121,10 @@ BEGIN {
 	dbinterface_Template["opt-bogus-field"]="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
 	dbinterface_Template["opt-no-write"]   ="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
 	dbinterface_Template["opt-write-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
-	dbinterface_Template["opt-chmod-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to work on.";
+	dbinterface_Template["opt-work-entry"] ="PRIVMSG %s :[%s] fatal: no entry specified to work on.";
 	dbinterface_Template["opt-no-perms"]   ="PRIVMSG %s :[%s] fatal: must specify new permission strings.";
+	dbinterface_Template["opt-no-owner"]   ="PRIVMSG %s :[%s] fatal: must specify a new owner.";
+
 	#
 	# non-error results
 	#
@@ -132,12 +139,14 @@ BEGIN {
 	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`";
 	dbinterface_Template["chmod-usage"]      ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]:[r-][w-][x-][ [~&@%%+n]:[r-][w-][x-] [...]]`";
 	dbinterface_Template["chmod-success"]    ="PRIVMSG %s :[%s] Successfully modified permissions for entry `%s` (now: %s)";
+	dbinterface_Template["chown-success"]    ="PRIVMSG %s :[%s] Successfully transferred ownership of entry `%s` to `%s`."
 	#
 	# denied permissions
 	#
 	dbinterface_Template["perm-no-read"]     ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to read entry `%s` (%s:%s)";
 	dbinterface_Template["perm-no-write"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify entry `%s` (%s:%s)";
 	dbinterface_Template["perm-no-chmod"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify permissions for rank `%s` for entry `%s` (%s > %s)";
+	dbinterface_Template["perm-no-chown"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to transfer ownership of entry `%s`."
 }
 
 #
@@ -303,8 +312,9 @@ function dbinterface_Db(input,		success,argstring,Optionsi,secure) {
 				#
 				# no more conflicts. 
 				#
-				if ( "c" in Options ) { dbinterface_Sync_chmod(Options) }
-				else                  { dbinterface_Sync_write(Options) }
+				if ( "c" in Options )    { dbinterface_Sync_chmod(Options) }
+				else if ("C" in Options) { dbinterface_Sync_chown(Options) }
+				else                     { dbinterface_Sync_write(Options) }
 			}
 		}
 	}
@@ -633,7 +643,7 @@ function dbinterface_Query_search(Options,		success,mode,Results,Parts,db,page,m
 	}
 }
 
-function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,sep)  {
+function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,sep,mask)  {
 	if      ("w" in Options) {what="w";op="write"}
 	else if ("a" in Options) {what="a";op="append"}
 	else if ("r" in Options) {what="r";op="replace"}
@@ -728,10 +738,14 @@ function dbinterface_Sync_write(Options,	Current,Parts,old,date,new,what,op,Sub,
 		#
 		# entry doesn't exist. Write a new one.
 		#
+		# which mask do we use?
+		#
+		if ( db in dbinterface_Mask ) { mask=dbinterface_Mask[db];    }
+		else                          { mask=dbinterface_Defaultmask; }
 		new=sprintf(						\
 			"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
 			Options[what],					\
-			dbinterface_Mask[db],				\
+			mask,						\
 			USER,						\
 			USER,						\
 			date,						\
@@ -758,12 +772,12 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 	#
 	# no label specified to work on.
 	#
-	if ((Options["c"]=="")) { send( sprintf( dbinterface_Template["opt-chmod-entry"], \
+	if ((Options["c"]=="")) { send( sprintf( dbinterface_Template["opt-work-entry"], \
 		$3,		\
 		"db => chmod"	\
 	) ); return -1 }
 	#
-	# no write content specified. Complain.
+	# no permissions string specified. Complain.
 	#
 	else if ((Options["--"] == "")) { send( sprintf( dbinterface_Template["opt-no-perms"], \
 		$3,		\
@@ -858,6 +872,65 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 		"db => chmod",				\
 		Options["c"],				\
 		Parts[dbinterface_Field["perms"]]	\
+	) );
+
+	return 0;
+}
+
+function dbinterface_Sync_chown(Options,	Results,db,Parts) {
+	#
+	# no label specified to work on.
+	#
+	if ((Options["C"]=="")) { send( sprintf( dbinterface_Template["opt-work-entry"], \
+		$3,		\
+		"db => chown"	\
+	) ); return -1 }
+	#
+	# no new owner specified. Complain.
+	#
+	else if ((Options["--"] == "")) { send( sprintf( dbinterface_Template["opt-no-owner"], \
+		$3,		\
+		"db => chown"	\
+	) ); return -2 }
+
+	#
+	# lookup the entry in question and throw errors if needed:
+	#
+	array(Results);
+	db=dbinterface_Use[$3];
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["C"],2,0,Results);
+
+	if ( success == 1 ) { send( sprintf( dbinterface_Template["query-not-found"], \
+		$3,		\
+		"db => chown",	\
+		Options["C"],	\
+		db		\
+	) ); return -3 }
+
+	#
+	# check to see whether the caller in question is the owner of this entry
+	#
+	line=db_Get(db_Persist[db],Results[1]);
+	db_Dissect(line,Parts);
+
+	if ( USER != Parts[dbinterface_Field["owner"]] ) { send( sprintf( dbinterface_Template["perm-no-chown"], \
+		$3,		\
+		"db => chown",	\
+		USER,		\
+		Options["C"]	\
+	) ); return -4 }
+
+	#
+	# perform a database update to transfer ownership.
+	#
+	Parts[dbinterface_Field["owner"]] = Options["--"];
+	db_Update(db_Persist[db],Results[1],acut(Parts,1,7,"\x1E"));
+
+	send( sprintf( dbinterface_Template["chown-success"], \
+		$3,					\
+		"db => chmod",				\
+		Options["C"],				\
+		Parts[dbinterface_Field["owner"]]	\
 	) );
 
 	return 0;
