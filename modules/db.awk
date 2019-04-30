@@ -140,10 +140,50 @@ function db_Update(db,line,new,		Parts,l,count,date,tempfile){
 #
 # db_Add will allocate a new entry into the database file.
 # It accepts a few arguments:
-#	`db`       as the database the new entry should be stored in.
-#	`new`      as the new entry to be written to the database.
+#	`db`		as the database the new entry should be stored in.
+#	`new`		as the new entry to be written to the database.
 function db_Add(db,new){
 	print new >> db ; close(db);
+
+	return 0;
+}
+
+#
+# db_Remove will remove a line from the database file.
+# It accepts a few arguments:
+#	`db`		as the database the entry should be removed from.
+#	`line`		as the line in question to be removed.
+#
+function db_Remove(db,line,	c,l){
+	date=sys("date +%s");
+	tempfile=("/tmp/ircb-db-" rand()*1000000);
+	#
+	# keep reading lines from the database file, copying them over to a temporary file
+	# when we hit our target line `line`, we skip without writing it.
+	#
+	while ((getline l < db) > 0) {
+		#
+		# as long as we're not hitting our match, keep writing.
+		#
+		if (++count!=line){
+			#
+			# write our new line to the temporary file.
+			#
+			print l >> tempfile;
+		}
+	}
+	close(db);
+	close(tempfile);
+	#
+	# finally, overwrite the old database.
+	#
+	sys(                                            \
+	    sprintf(                                    \
+			"mv '%s' '%s' 2>/dev/null",	\
+			tempfile,			\
+			db				\
+		)					\
+	)
 
 	return 0;
 }

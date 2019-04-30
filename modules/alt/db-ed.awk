@@ -114,7 +114,7 @@ function db_Update(db,line,new,		l,date,tempfile){
 
 	sys(												\
 		sprintf(										\
-			"echo '%d\nc\n%s\n.\nw\nQ' | ed - '%s'",					\
+			"echo '%dc\n%s\n.\nw\nQ' | ed - '%s'",						\
 			line,										\
 			san(new),									\
 			db										\
@@ -130,6 +130,27 @@ function db_Update(db,line,new,		l,date,tempfile){
 #	`new`      as the new entry to be written to the database.
 function db_Add(db,new){
 	print new >> db;close(db);
+
+	return 0;
+}
+
+#
+# db_Remove will remove a line from the database file.
+# It accepts a few arguments:
+#	`db`		as the database the entry should be removed from.
+#	`line`		as the line in question to be removed.
+#
+function db_Remove(db,line,	c,l){
+	l=db_Get(db,line);
+	if ( l == "" ) { return 1 };
+
+	sys(												\
+		sprintf(										\
+			"echo '%dd\nw\nQ' | ed - '%s'",							\
+			line,										\
+			db										\
+		)											\
+	)
 
 	return 0;
 }
