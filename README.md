@@ -6,6 +6,10 @@ Sample invocation using a FIFO `in` might look like:
 ```
 netcat my.irc.network 6667 <in | awk -f ircb.awk >in
 ```
+Another invocation that uses the bash `/dev/tcp` pseudofile extension:
+```
+exec 3<>/dev/tcp/my.irc.network/6667; awk -f ircb.awk <&3 >&3
+```
 This setup is extremely versatile; run the data streams through as many pipes and `sed` and `grep` commands as you want.
 
 ## modules
@@ -15,6 +19,10 @@ This setup is extremely versatile; run the data streams through as many pipes an
 Including modules can be done using awk's `-f` option:
 ```
 netcat my.irc.network 6667 <in | awk -f ircb.awk -f modules/boot.awk -f modules/tell.awk >in
+```
+Or:
+```
+exec 3<>/dev/tcp/my.irc.network/6667; tee irc/log <&3 | awk -f ircb.awk >&3
 ```
 For information on module usage, check the actual `.awk` file.
 
