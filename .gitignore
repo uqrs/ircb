@@ -2,5 +2,6 @@ dump/
 irc/log
 irc/out
 cfg/*
+!cfg/sample_config.awk
 data/*
 TODO
