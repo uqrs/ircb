@@ -6,10 +6,10 @@
 # Database contents are stored as:
 # [label]\x1E[perms]\x1E[owner]\x1E[edited_by]\x1E[created]\x1E[modified]\x1E[contents]\n
 # [label] is the name of the entry itself.
-# [perms] is a string of 14 characters that stores read-write permissions for every irc-rank from none to ~
+# [perms] is a string of 14 characters that stores read-write permissions for every irc-rank from none to @
 #               the layout is:
-#                ~    &    @    %    +    " "
-#               [rwd][rwd][rwd][rwd][rwd][rwd]
+#                @    +    n
+#               [rwd][rwd][rwd]
 #         where 'r' = read
 #               'w' = write
 #               'd' = delete
@@ -57,6 +57,7 @@
 #   - Standardise error codes; make it so that each function returns a given error code for similar issues.
 #     e.g. a "no such entry exist" code will always be -2, etc.
 #   - Clean the getopt parsing up even more and find some kind of structure for error-message printing.
+#
 BEGIN {
 	# databases are flat files that store actual information.
 	#db_Persist["remember"]="./data/db/remember-db";
@@ -69,14 +70,21 @@ BEGIN {
 
 	# `dbinterface_Authority` specifies which the "authority" channel for a database.
 	# the database authority channel is the channel from which e user-modes such
-	# as ~, &, @, %, + etc. are looked up.
+	# as @, + etc. are looked up.
 	#dbinterface_Authority["remember"]="#channel";
 
 	# `dbinterface_Mask` specifies the default permissions for a newly allocated entry.
-	#dbinterface_Mask["remember"]="rw-rw-rw-r--r--r--";
+	## NOTICE: if your IRCd supports extended ranks (such as ~, &, %, etc.) then set your Mask
+	##         to a sufficient length to accomodate these ranks(!)
+	##        e.g. given PREFIX=(qoahv)~&@%+ you should set your mask to:
+	##          "rwdrwdrw-rw-r--r--" or something similar to accomodate each individual value.
+	##
+	## It is also a good idea to perform the following should you reuse your db for a different server:
+	##	nawk 'BEGIN{FS="\x1E";OFS="\x1E"} {$2="new-perm-string";print}' <my-old-db > my-new-db
+	#dbinterface_Mask["remember"]="rwdr--r--";
 
-	# default mask to be falled back upon should none be allocated
-	dbinterface_Defaultmask="rwdrwdrwdrwdr--r--";
+	# default mask to be fallen back upon should none be allocated
+	dbinterface_Defaultmask="rw-r--r--";
 	
 	# reference table for fields 
 	dbinterface_Field["label"]	=1;

@@ -18,12 +18,11 @@ BEGIN {
 	# is higher than user B's rank, one can do `modesec_Rank[a_rank] < modesec_Rank[b_rank]`
 	# `n` stands in for "no rank"
 	#
-	modesec_Ranks["n"]=5;
-	modesec_Ranks["+"]=4;
-	modesec_Ranks["%"]=3;
-	modesec_Ranks["@"]=2;
-	modesec_Ranks["&"]=1;
-	modesec_Ranks["~"]=0;
+	# modesec will rebuild this table if a `PREFIX` capability is delivered by the server.
+	#
+	modesec_Ranks["n"]=2;
+	modesec_Ranks["+"]=1;
+	modesec_Ranks["@"]=0;
 
 	#
 	# modesec_Temp: see comment on `353` vs. `366` below.
@@ -93,6 +92,30 @@ function modesec_Quit() {
 		if ( i ~ (" " USER "$") ) {
 			delete modesec_Lookup[i];
 		}
+	}
+}
+
+#
+# construct a `modesec_Ranks` table from a given PREFIX string.
+#
+function modesec_Createranks (string) {
+	delete modesec_Ranks;
+
+	characters=substr(string,index(string,")"i)+1);
+
+	for ( c=length(characters) ; c>0 ; c-- ) {
+		modesec_Ranks[substr(characters,c,1)]=(c-1);
+	}
+
+	modesec_Ranks["n"]=length(modesec_Ranks);
+}
+#
+# handle the server-capabilities message (`005`). Look through it for a `PREFIX` header.
+# if it exists, reconstruct `modesec_Ranks` using the provided ranks.
+#
+($2 == "005") {
+	if ( match($0,/PREFIX=\([^) ]+\)[^ ]+/) != 0 ) {
+		modesec_Createranks(substr($0,RSTART,RLENGTH))
 	}
 }
 
