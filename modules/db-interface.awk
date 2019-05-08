@@ -117,7 +117,7 @@ BEGIN {
 	dbinterface_Template["write-success"]    ="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
 	dbinterface_Template["update-success"]   ="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
 	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`";
-	dbinterface_Template["chmod-usage"]      ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]:[r-][w-][x-][ [~&@%%+n]:[r-][w-][x-] [...]]`";
+	dbinterface_Template["chmod-usage"]      ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]+=[r-][w-][x-][ [~&@%%+n]+=[r-][w-][x-] [...]]`";
 	dbinterface_Template["chmod-success"]    ="PRIVMSG %s :[%s] Successfully modified permissions for entry `%s` (now: %s)";
 	dbinterface_Template["chown-success"]    ="PRIVMSG %s :[%s] Successfully transferred ownership of entry `%s` to `%s`.";
 	dbinterface_Template["remove-success"]   ="PRIVMSG %s :[%s] Successfully removed entry `%s` from `%s`.";
@@ -125,7 +125,7 @@ BEGIN {
 	# denied permissions
 	dbinterface_Template["perm-no-read"]     ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to read entry `%s` (%s:%s)";
 	dbinterface_Template["perm-no-write"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify entry `%s` (%s:%s)";
-	dbinterface_Template["perm-no-chmod"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify permissions for rank `%s` for entry `%s` (%s > %s)";
+	dbinterface_Template["perm-no-chmod"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify permissions for rank `%s` for entry `%s` (%s >= %s)";
 	dbinterface_Template["perm-no-chown"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to transfer ownership of entry `%s`."
 	dbinterface_Template["perm-no-remove"]   ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to remove entry `%s` (%s:%s)";
 }
@@ -648,8 +648,8 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 		return -5
 	}
 	# the stdopt arg must be a sequence of characters in the form of:
-	#  R:[r-][w-][x-][\x20R2:[r-][w-][x-] [...]
-	# where `R` corresponds to one of the ranks found in `modesec_Ranks`
+	#  R:[r-][w-][x-][ R2:[r-][w-][x-] [...]
+	# where `R` is an arbitrary-length string containing characters found in `modesec_Ranks`
 	array(Modstring);
 	split(Options["--"],Modstrings);
 
@@ -665,17 +665,22 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 	# this loop intends to catch syntax errors and illegal modifications
 	for ( i in Modstrings ) {
 		# check syntax
-		if ( Modstrings[i] !~ /^[~&@%\+n]:[r\-][w\-][d\-]$/ ) {
+		if ( Modstrings[i] !~ /^[~&@%\+n]+=[r\-][w\-][d\-]$/ ) {
 			send(sprintf(dbinterface_Template["chmod-usage"],
 				$3, "db => chmod"))
 			return -3
 		}
 
-		if ( modesec_Ranks[substr(Modstrings[i],1,1)] < modesec_Ranks[effective_rank] ) {
-			# user is not permitted to modify this entry
-			send(sprintf(dbinterface_Template["perm-no-chmod"],
-				$3, "db => chmod", USER, substr(Modstrings[i],1,1), Options["c"], substr(Modstrings[i],1,1), effective_rank))
-			return -4
+		split(Modstrings[i],Modparts,"=");
+		for ( c=1 ; c<=length(Modparts[1]) ; c++ ) {
+			# TODO: modesec should probably autodetect capabilities so that `0` in modesec_Ranks becomes equal to '@' on servers
+			# without extended permissions (no ~&%)
+			if ( modesec_Ranks[substr(Modparts[1],c,1)] <= modesec_Ranks[effective_rank] && (modesec_Ranks[effective_rank] != 0) ) {
+				# user is not permitted to modify this entry
+				send(sprintf(dbinterface_Template["perm-no-chmod"],
+					$3, "db => chmod", USER, substr(Modstrings[i],1,1), Options["c"], substr(Modparts[1],c,1), effective_rank))
+				return -4
+			}
 		}
 	}
 
@@ -684,14 +689,16 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 	db_Dissect(line,Parts);
 
 	for ( i in Modstrings ) {
-		split(Modstrings[i],Modparts,":");
+		split(Modstrings[i],Modparts,"=");
 
-		perms=Parts[dbinterface_Field["perms"]];
-		Parts[dbinterface_Field["perms"]]=(				\
-			substr(perms,1,modesec_Ranks[Modparts[1]]*3)		\
-			Modparts[2]						\
-			substr(perms,(modesec_Ranks[Modparts[1]]+1)*3+1)	\
-		)
+		for ( c=1 ; c<=length(Modparts[1]) ; c++ ) {
+			perms=Parts[dbinterface_Field["perms"]];
+			Parts[dbinterface_Field["perms"]]=(					\
+				substr(perms,1,modesec_Ranks[substr(Modparts[1],c,1)]*3)	\
+				Modparts[2]							\
+				substr(perms,(modesec_Ranks[substr(Modparts[1],c,1)]+1)*3+1)	\
+			)
+		}
 	}
 
 	# perform a database update to apply new permissions.
