@@ -9,10 +9,10 @@
 # [perms] is a string of 14 characters that stores read-write permissions for every irc-rank from none to ~
 #               the layout is:
 #                ~    &    @    %    +    " "
-#               [rw-][rw-][rw-][rw-][rw-][rw-]
+#               [rwd][rwd][rwd][rwd][rwd][rwd]
 #         where 'r' = read
 #               'w' = write
-#               '-' = reserved for potential future features.
+#               'd' = delete
 #
 # [owner] is the nickname string of the individual who first allocated this entry
 # [edited_by] is the nickname string of the individual who last modified this entry
@@ -76,7 +76,7 @@ BEGIN {
 	#dbinterface_Mask["remember"]="rw-rw-rw-r--r--r--";
 
 	# default mask to be falled back upon should none be allocated
-	dbinterface_Defaultmask="rw-rw-rw-rw-r-xr-x";
+	dbinterface_Defaultmask="rwdrwdrwdrwdr--r--";
 	
 	# reference table for fields 
 	dbinterface_Field["label"]	=1;
@@ -127,7 +127,7 @@ BEGIN {
 	dbinterface_Template["perm-no-write"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify entry `%s` (%s:%s)";
 	dbinterface_Template["perm-no-chmod"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to modify permissions for rank `%s` for entry `%s` (%s > %s)";
 	dbinterface_Template["perm-no-chown"]    ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to transfer ownership of entry `%s`."
-	dbinterface_Template["perm-no-remove"]   ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to remove entry `%s`."
+	dbinterface_Template["perm-no-remove"]   ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to remove entry `%s` (%s:%s)";
 }
 
 # top-level function: check the input option string, and call the appropriate function.
@@ -665,7 +665,7 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 	# this loop intends to catch syntax errors and illegal modifications
 	for ( i in Modstrings ) {
 		# check syntax
-		if ( Modstrings[i] !~ /^[~&@%\+n]:[r\-][w\-][x\-]$/ ) {
+		if ( Modstrings[i] !~ /^[~&@%\+n]:[r\-][w\-][d\-]$/ ) {
 			send(sprintf(dbinterface_Template["chmod-usage"],
 				$3, "db => chmod"))
 			return -3
@@ -770,11 +770,15 @@ function dbinterface_Remove(Options,	Results,db,success,line) {
 	line=db_Get(db_Persist[db],Results[1]);
 	db_Dissect(line,Parts);
 
-	if ( USER != Parts[dbinterface_Field["owner"]] ) {
-		# the caller is not this entry's owner
-		send(sprintf(dbinterface_Template["perm-no-remove"],
-			$3, "db => remove", USER, Options["--"]))
-		return -4
+	# if security for this channel is enabled, check permissions.
+	if (db in dbinterface_Authority) {
+		success=dbinterface_Resolveperms(db,Parts,"d");
+		if ( success == 1 ) {
+			# user is not permitted to delete.
+			send(sprintf(dbinterface_Template["perm-no-remove"],
+				$3, "db => remove", USER, Options["--"], modesec_Lookup[dbinterface_Authority[db] " " USER], Parts[dbinterface_Field["perms"]]))
+			return -4
+		}
 	}
 
 	#
