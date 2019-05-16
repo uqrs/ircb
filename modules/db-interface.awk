@@ -4,8 +4,9 @@
 # REQUIRES either db.awk or alt/db-ed.awk
 #
 # Database contents are stored as:
-# [label]\x1E[perms]\x1E[owner]\x1E[edited_by]\x1E[created]\x1E[modified]\x1E[contents]\n
+# [label]\x1E[tag]\x1E[perms]\x1E[owner]\x1E[edited_by]\x1E[created]\x1E[modified]\x1E[contents]\n
 # [label] is the name of the entry itself.
+# [tag]   is a secondary identifier that can be used to categorise certain entries.
 # [perms] is a string of 14 characters that stores read-write permissions for every irc-rank from none to @
 #               the layout is:
 #                @    +    n
@@ -45,6 +46,7 @@
 #     DATABASE META MODIFICATION (use with -S)
 #       -c        change permissions for entry
 #       -C        change ownership of entry
+#       -t        modify tag for certain entry
 #
 # SECURITY
 #  db-interface makes use of a joint nickserv-security and mode-security implementation
@@ -88,12 +90,13 @@ BEGIN {
 	
 	# reference table for fields 
 	dbinterface_Field["label"]	=1;
-	dbinterface_Field["perms"]	=2;
-	dbinterface_Field["owner"]	=3;
-	dbinterface_Field["edited_by"]	=4;
-	dbinterface_Field["created"]	=5;
-	dbinterface_Field["modified"]	=6;
-	dbinterface_Field["contents"]	=7;
+	dbinterface_Field["tag"]        =2;
+	dbinterface_Field["perms"]	=3;
+	dbinterface_Field["owner"]	=4;
+	dbinterface_Field["edited_by"]	=5;
+	dbinterface_Field["created"]	=6;
+	dbinterface_Field["modified"]	=7;
+	dbinterface_Field["contents"]	=8;
 
 	# message/response templates
 	dbinterface_Template["no-db"]    ="PRIVMSG %s :[%s] fatal: no database allocated for channel '%s'.";
@@ -107,28 +110,31 @@ BEGIN {
 	dbinterface_Template["opt-ns-entry"]    ="PRIVMSG %s :[%s] fatal: must specify an entry to display info on.";
 	dbinterface_Template["opt-noarg"]       ="PRIVMSG %s :[%s] fatal: option `%s` requires an argument.";
 	dbinterface_Template["opt-no-query"]    ="PRIVMSG %s :[%s] fatal: no search query specified.";
-	dbinterface_Template["opt-bogus-field"] ="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
+	dbinterface_Template["opt-bogus-field"] ="PRIVMSG %s :[%s] fatal: argument to `-f` must be one of 'label', 'tag', 'perms', 'owner', 'edited_by', 'created', 'modified', 'contents'.";
 	dbinterface_Template["opt-no-write"]    ="PRIVMSG %s :[%s] fatal: no content supplied for write operation.";
 	dbinterface_Template["opt-write-entry"] ="PRIVMSG %s :[%s] fatal: no entry specified to write to.";
 	dbinterface_Template["opt-work-entry"]  ="PRIVMSG %s :[%s] fatal: no entry specified to work on.";
 	dbinterface_Template["opt-remove-entry"]="PRIVMSG %s :[%s] fatal: no entry specified to remove.";
 	dbinterface_Template["opt-no-perms"]    ="PRIVMSG %s :[%s] fatal: must specify new permission strings.";
 	dbinterface_Template["opt-no-owner"]    ="PRIVMSG %s :[%s] fatal: must specify a new owner.";
+	dbinterface_Template["opt-no-tag"]      ="PRIVMSG %s :[%s] fatal: must specify a new tag.";
 
 	# non-error results
-	dbinterface_Template["query-no-results"] ="PRIVMSG %s :[%s] fatal: no results for query '%s' in database `%s`.";
-	dbinterface_Template["query-not-found"]  ="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
-	dbinterface_Template["query-info"]       ="PRIVMSG %s :[%s] \x02Info on \x0F%s\x02 from \x0F%s \x02-- Owned by: \x0F%s\x02; Last modified by: \x0F%s\x02 -- Created at: \x0F%s; \x02Last modified at: \x0F%s\x02 -- Permissions: \x0F%s;"
-	dbinterface_Template["query-show"]       ="PRIVMSG %s :[%s] %s %s";
-	dbinterface_Template["query-search-show"]="PRIVMSG %s :[%s][%d/%d] %s %s";
-	dbinterface_Template["query-search-page"]="PRIVMSG %s :[%s][%d/%d] Results: %s"
-	dbinterface_Template["write-success"]    ="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
-	dbinterface_Template["update-success"]   ="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
-	dbinterface_Template["substitute-usage"] ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`";
-	dbinterface_Template["chmod-usage"]      ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]+=[r-][w-][x-][ [~&@%%+n]+=[r-][w-][x-] [...]]`";
-	dbinterface_Template["chmod-success"]    ="PRIVMSG %s :[%s] Successfully modified permissions for entry `%s` (now: %s)";
-	dbinterface_Template["chown-success"]    ="PRIVMSG %s :[%s] Successfully transferred ownership of entry `%s` to `%s`.";
-	dbinterface_Template["remove-success"]   ="PRIVMSG %s :[%s] Successfully removed entry `%s` from `%s`.";
+	dbinterface_Template["query-no-results"]  ="PRIVMSG %s :[%s] fatal: no results for query '%s' in database `%s`.";
+	dbinterface_Template["query-not-found"]   ="PRIVMSG %s :[%s] fatal: no such entry '%s' in database `%s`.";
+	dbinterface_Template["query-info"]        ="PRIVMSG %s :[%s] \x02Info on\x0F %s\x02 from\x0F %s\x02 tagged as\x0F %s\x02 -- Owned by:\x0F %s\x02; Last modified by:\x0F %s\x02 -- Created at:\x0F %s\x02; Last modified at:\x0F %s\x02 -- Permissions:\x0F %s;"
+	dbinterface_Template["query-show"]        ="PRIVMSG %s :[%s] %s %s";
+	dbinterface_Template["query-search-show"] ="PRIVMSG %s :[%s][%d/%d] %s %s";
+	dbinterface_Template["query-search-page"] ="PRIVMSG %s :[%s][%d/%d] Results: %s"
+	dbinterface_Template["write-success"]     ="PRIVMSG %s :[%s] Write to entry '%s' successful (%s:%s + %s @ %s)";
+	dbinterface_Template["update-success"]    ="PRIVMSG %s :[%s] Entry '%s' updated successfully (%s:%s + %s @ %s)";
+	dbinterface_Template["substitute-usage"]  ="PRIVMSG %s :[%s] Usage: `:db -Ss s/target/replacement/`";
+	dbinterface_Template["chmod-usage"]       ="PRIVMSG %s :[%s] Usage: `[~&@%%+n]+=[r-][w-][x-][ [~&@%%+n]+=[r-][w-][x-] [...]]`";
+	dbinterface_Template["chmod-success"]     ="PRIVMSG %s :[%s] Successfully modified permissions for entry `%s` (now: %s)";
+	dbinterface_Template["chown-success"]     ="PRIVMSG %s :[%s] Successfully transferred ownership of entry `%s` to `%s`.";
+	dbinterface_Template["tag-success"]       ="PRIVMSG %s :[%s] Successfully modified tag for entry `%s` (%s => %s)";
+	dbinterface_Template["tag-remove-success"]="PRIVMSG %s :[%s] Successfully removed tag for entry `%s` (%s => %s)";
+	dbinterface_Template["remove-success"]    ="PRIVMSG %s :[%s] Successfully removed entry `%s` from `%s`.";
 
 	# denied permissions
 	dbinterface_Template["perm-no-read"]     ="PRIVMSG %s :[%s] fatal: user `%s` is not authorized to read entry `%s` (%s:%s)";
@@ -161,7 +167,7 @@ function dbinterface_Db(input,        success,argstring,Optionsi,secure) {
 	array(Options);
 	argstring=cut(input,5);
 
-	success=getopt_Getopt(argstring,"Q,R,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c:,C:,v",Options);
+	success=getopt_Getopt(argstring,"Q,R,S,p:,r:,f:,F,E,i,w:,a:,p:,s,O,T,c:,C:,t:,v",Options);
 
 	if (success == 1) {
 		# errors with option parsing
@@ -191,7 +197,7 @@ function dbinterface_Db(input,        success,argstring,Optionsi,secure) {
 			# PERFORM A QUERY OPERATION (-Q)
 			if (Options[0] == "Q") {
 				# filter/blacklist out operations that do not apply to `-Q`
-				success=getopt_Uncompatible(Options,"waOTcC");
+				success=getopt_Uncompatible(Options,"waOTcCt");
 
 				if (success==1) {
 					# found options not compatible with `-Q`
@@ -227,7 +233,7 @@ function dbinterface_Db(input,        success,argstring,Optionsi,secure) {
 
 			# PERFORM A DELETION OPERATION (-R)
 			} else if (Options[0] == "R") {
-				success=getopt_Uncompatible(Options,"QSsprfEFviwarpcC");
+				success=getopt_Uncompatible(Options,"QSsprfEFviwarpcCt");
 
 				if (success==1) {
 					# found options not appliccable to `-R`
@@ -249,13 +255,13 @@ function dbinterface_Db(input,        success,argstring,Optionsi,secure) {
 						$3, "db => getopt", "-" Options[0], "-S"))
 					return -6
 				}
-				# look for one of `-warpcC`
-				success=getopt_Either(Options,"warpcC");
+				# look for one of `-warpcCt`
+				success=getopt_Either(Options,"warpcCt");
 
 				if (success == 1) {
-					# none of `-warpcC` specified.
+					# none of `-warpcCt` specified.
 					send(sprintf(dbinterface_Template["opt-neither-c"],
-						$3, "db => getopt", "`-w`, `-a`, `-r`, `-p`, `-c` or `-C`", "-S"))
+						$3, "db => getopt", "`-w`, `-a`, `-r`, `-p`, `-c`, `-C` or `-t`", "-S"))
 					return -9
 				}
 
@@ -275,6 +281,10 @@ function dbinterface_Db(input,        success,argstring,Optionsi,secure) {
 					# perform a chown (`-SC`)
 					dbinterface_Sync_chown(Options)
 				}
+				else if ("t" in Options) {
+					# perform a tag operation (`-St`)
+					dbinterface_Sync_tag(Options)
+				}
 				else {
 					# perform write operation (`-S[warp]`)
 					dbinterface_Sync_write(Options)
@@ -286,7 +296,7 @@ function dbinterface_Db(input,        success,argstring,Optionsi,secure) {
 
 
 # `dbinterface_Query_info()` retrieves information on a given database entry, and then displays it.
-function dbinterface_Query_info(Options,        Results,Parts,line,db,success,created_at,modified_at) {
+function dbinterface_Query_info(Options,        Results,Parts,line,db,success,created_at,modified_at,tag) {
 	if (Options["--"] == "") {
 		# user did not specify any arguments to `-i`
 		send(sprintf(dbinterface_Template["opt-ns-entry"],
@@ -323,10 +333,14 @@ function dbinterface_Query_info(Options,        Results,Parts,line,db,success,cr
 		}
 	}
 
-	created_at=sys("date -d '@" Parts[5] "'");
-	modified_at=sys("date -d '@" Parts[6] "'");
-	send(sprintf(dbinterface_Template["query-info"], \
-		$3, "db => query-info", Parts[1], db, Parts[3], Parts[4], created_at, modified_at, Parts[2]))
+	if ( Parts[dbinterface_Field["tag"]] == "" ) { tag="N/A" }
+	else                                         { tag=Parts[dbinterface_Field["tag"]] }
+
+	created_at=sys("date -d '@" Parts[dbinterface_Field["created"]] "'");
+	modified_at=sys("date -d '@" Parts[dbinterface_Field["modified"]] "'");
+	send(sprintf(dbinterface_Template["query-info"],
+		$3, "db => query-info", Parts[dbinterface_Field["label"]], db, tag, Parts[dbinterface_Field["owner"]],
+		Parts[dbinterface_Field["edited_by"]], created_at, modified_at, Parts[dbinterface_Field["perms"]]))
 
 	return 0;
 }
@@ -368,7 +382,7 @@ function dbinterface_Query_show(Options,	Parts,Results,line,success) {
 	}
 
 	send(sprintf(dbinterface_Template["query-show"],
-		$3, "db => query-show", Parts[1], Parts[7]))
+		$3, "db => query-show", Parts[dbinterface_Field["label"]], Parts[dbinterface_Field["contents"]]))
 
 	return 0
 }
@@ -522,7 +536,7 @@ function dbinterface_Query_search(Options,        success,mode,Results,Parts,db,
 		}
 
 		send(sprintf(dbinterface_Template["query-search-show"],
-			$3, "db => query-show", result, length(Results), Parts[1], Parts[7]))
+			$3, "db => query-show", result, length(Results), Parts[dbinterface_Field["label"]], Parts[dbinterface_Field["contents"]]))
 
 		return 0
 	}
@@ -597,7 +611,8 @@ function dbinterface_Sync_write(Options,        Current,Parts,old,date,new,what,
 
 		# perform our update operation and notify the user
 		gsub(/ +/," ",Parts[dbinterface_Field["contents"]]);
-		db_Update(db_Persist[db],Current[1],acut(Parts,1,7,"\x1E"));
+		db_Update(db_Persist[db],Current[1],
+			acut(Parts,dbinterface_Field["label"],dbinterface_Field["contents"],"\x1E"))
 
 		send( sprintf( dbinterface_Template["update-success"], \
 			$3, "db => sync-update/" op, Parts[dbinterface_Field["label"]], Parts[dbinterface_Field["owner"]],
@@ -611,8 +626,9 @@ function dbinterface_Sync_write(Options,        Current,Parts,old,date,new,what,
 		if ( db in dbinterface_Mask ) { mask=dbinterface_Mask[db];    }
 		else                          { mask=dbinterface_Defaultmask; }
 		new=sprintf(						\
-			"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
+			"%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s\x1E%s",	\
 			Options[what],					\
+			"",						\
 			mask,						\
 			USER,						\
 			USER,						\
@@ -710,7 +726,8 @@ function dbinterface_Sync_chmod(Options,	Modstrings,Modparts,effective_rank,resu
 	}
 
 	# perform a database update to apply new permissions.
-	db_Update(db_Persist[db],Results[1],acut(Parts,1,7,"\x1E"));
+	db_Update(db_Persist[db],Results[1],
+		acut(Parts,dbinterface_Field["label"],dbinterface_Field["contents"],"\x1E"))
 
 	send(sprintf(dbinterface_Template["chmod-success"],
 		$3, "db => chmod", Options["c"], Parts[dbinterface_Field["perms"]]))
@@ -755,11 +772,72 @@ function dbinterface_Sync_chown(Options,	Results,db,Parts,line,success) {
 
 	# perform a database update to transfer ownership.
 	Parts[dbinterface_Field["owner"]] = Options["--"];
-	db_Update(db_Persist[db],Results[1],acut(Parts,1,7,"\x1E"));
+	db_Update(db_Persist[db],Results[1],
+		acut(Parts,dbinterface_Field["label"],dbinterface_Field["contents"],"\x1E"))
 
 	send(sprintf(dbinterface_Template["chown-success"],
 		$3, "db => chmod", Options["C"], Parts[dbinterface_Field["owner"]]))
 
+	return 0
+}
+
+function dbinterface_Sync_tag (Options,		Results,db,Parts,line,success,previous) {
+	if ((Options["t"]=="")) {
+		# no label specified to work on.
+		send(sprintf(dbinterface_Template["opt-work-entry"],
+			$3, "db => tag"))
+		return -1
+	}
+
+	# lookup the entry in question and throw errors if needed:
+	array(Results);
+	db=dbinterface_Use[$3];
+	success=db_Search(db_Persist[db],dbinterface_Field["label"],Options["t"],2,0,Results);
+
+	if ( success == 1 ) {
+		send(sprintf(dbinterface_Template["query-not-found"],
+			$3, "db => tag", Options["t"], db))
+		return -3
+	}
+
+	line=db_Get(db_Persist[db],Results[1]);
+	db_Dissect(line,Parts);
+
+	# if security for this channel is enabled, check permissions.
+	if (db in dbinterface_Authority) {
+		success=dbinterface_Resolveperms(db,Parts,"w");
+		if ( success == 1 ) {
+			# user is not permitted to write.
+			send(sprintf(dbinterface_Template["perm-no-write"],
+				$3, "db => tag", USER, Parts[dbinterface_Field["label"]],
+				modesec_Lookup[dbinterface_Authority[db] " " USER], Parts[dbinterface_Field["perms"]]))
+			return -3
+		}
+	}
+
+	# if a new tag was specified, then modify it:
+	if (Options["--"] != "") {
+		# modify the tag
+		if (Parts[dbinterface_Field["tag"]] == "") { previous="N/A" }
+		else                                       { previous=Parts[dbinterface_Field["tag"]] }
+		Parts[dbinterface_Field["tag"]] = Options["--"];
+		db_Update(db_Persist[db],Results[1],
+			acut(Parts,dbinterface_Field["label"],dbinterface_Field["contents"],"\x1E"))
+
+		send(sprintf(dbinterface_Template["tag-success"],
+			$3, "db => tag", Options["t"], previous, Parts[dbinterface_Field["tag"]]))
+	# if no new tag was specified, clear the tag
+	} else {
+		if (Parts[dbinterface_Field["tag"]] == "") { previous="N/A" }
+		else                                       { previous=Parts[dbinterface_Field["tag"]] }
+		Parts[dbinterface_Field["tag"]] = "";
+
+		db_Update(db_Persist[db],Results[1],
+			acut(Parts,dbinterface_Field["label"],dbinterface_Field["contents"],"\x1E"))
+
+		send(sprintf(dbinterface_Template["tag-remove-success"],
+			$3, "db => tag", Options["t"], previous, "N/A"))
+	}
 	return 0
 }
 
