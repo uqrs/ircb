@@ -57,90 +57,105 @@
 #
 # for help and support with irc, read: https://tools.ietf.org/html/rfc2812
 # for help and support with awk, read: awk(1)
-function send (mesg)                      {print (mesg "\r\n");fflush();}                                       # send message
-function sys  (call,     	out)      {call | getline out;close(call);return out;}                          # system call wrapper
-function lsys (call,Out,	out)      {while ((call | getline out)>0){Out[length(Out)+1]=out};close(call);} # system call wrapper but it does multiple lines
-function array(Arr)                       {split("",Arr);}                                                      # create new array
-function san  (string,  	 out)     {out=string;gsub(/'/,"'\\''",out);return out} #"                      # sanitise string for use in system calls
-function rsan (string,           out)     {out=string;gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/,"\\\\&",out);return out}  # ditto, but sanitise regex
-#
-# function: retrieve fields x to y
-#
-function cut (string,begin,end,sep,fmt_sep,        out,Arr) {
-    (sep != "")    || (sep=FS);
-    (fmt_sep != "")|| (fmt_sep=sep);
-    split(string,Arr,sep);
-    (end != 0)     || (end=length(Arr));
-
-    for (begin;begin<=end;begin++){
-        out=(out Arr[begin] fmt_sep);
-    };
-
-    return out;
-}
-#
-# function: same as `cut` but accept an already-split array.
-#
-function acut(Arr,begin,end,fmt_sep,	out) {
-    (end != 0)     || (end=length(Arr));
-    (fmt_sep != "")|| (fmt_sep=FS);
-
-    for (begin;begin<=end;begin++){
-        out=(out Arr[begin] fmt_sep);
-    };
-
-    return out;
+function send (msg) {
+	print (msg "\r\n")
+	fflush()
 }
 
-#
-# variables needed to connect to irc
-#
+function sys (syscall,    stdout) {
+	syscall | getline stdout
+	close(syscall)
+	return stdout
+}
+
+function lsys (syscall, Lines,    stdout) {
+	while ((syscall | getline stdout) > 0) {
+		Lines[length(Lines)+1] = stdout
+	}
+	close(syscall)
+	return Lines[1]
+}
+
+function san (string) {
+	gsub(/'/, "'\\''", string)
+	return string
+}
+
+function rsan (string) {
+	gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/, "\\\\&", string)
+	return string
+}
+
+# assemble a substring from fields `begin` to `end`
+function cut (string, begin, end, delim, out_delim,    subs, Array) {
+    if (delim == "")
+	    delim = FS
+    if (out_delim == "")
+	    out_delim = delim
+
+    split(string, Array, delim)
+    if (!end)
+	    end = length(Array)
+
+    for (begin; begin <= end; begin++) {
+        subs = (subs Array[begin] out_delim)
+    }
+
+    return subs
+}
+
+# assemble substring from fields `begin` to `end` in array `Array`
+function acut(Array, begin, end, out_delim,    subs) {
+    if (!end)
+	    end = length(Array)
+    if (out_delim == "")
+	    out_delim = FS
+
+    for (begin; begin <= end; begin++){
+        subs = (subs Array[begin] out_delim)
+    }
+
+    return subs
+}
+
 BEGIN {
-    ircb_nick="ircb";
-    ircb_user="ircb";
-    ircb_rnam="irc-bot";
+    # TODO: hacky, configuration is not respected.
+    ircb_nick = "ircb"
+    ircb_user = "ircb"
+    ircb_realname = "irc-bot"
 
-    send("NICK " ircb_nick);
-    send("USER " ircb_user " * 0 :" ircb_rnam);
+    send("NICK " ircb_nick)
+    send("USER " ircb_user " * 0 :" ircb_realname)
 }
 
-#
-# destroy all ^Fs and ^J's.
-#
-{gsub(/[\r\n]+/,"")};
-
-#
-# USER = nick of the user who sent the command
-#
-{match($1,/^:([^!]+)!/);USER=substr($1,2,RLENGTH-2);}
-
-#
-# ping
-#
-$1 == "PING" {
-    send("PONG " substr($2,2));
+{
+    gsub(/[\r\n]+/, "")
 }
 
-#
-# if a user is DMing us, spoof the channel from our own nick to the users' nick
-# this ensures that `$3` can always be used as a target channel.
-#
+# USER is nick of the user who sent the command, if appliccable.
+{
+    match($1, /^:([^!]+)!/)
+    USER = substr($1, 2, RLENGTH-2)
+}
+
+($1 == "PING") {
+    send("PONG " substr($2, 2))
+}
+
+# for private correspondence, $3 will be changed from our own nick to the sender's nick
 ($3 == ircb_nick) && ($2 == "PRIVMSG") {
-    $3=USER;
+    $3 = USER
 }
 
-#
-# create a loopback circuit: PRIVMSG's received by `ircb` are interpreted as commands.
-#
+# PRIVMSG's received by ourselves are re-interpreted as commands.
 (USER == ircb_nick) && ($2 == "PRIVMSG") {
-	$0=substr(cut($0,4),2);
-	# recalculate the USER variable
-	match($1,/^:([^!]+)!/);
-	USER=substr($1,2,RLENGTH-2);
+	$0 = substr(cut($0, 4), 2)
+
+	match($1, /^:([^!]+)!/)
+	USER = substr($1, 2, RLENGTH-2)
 }
-#
-# handle us changing our own nick
-#
+
+# update after self-nick changes
 (USER == ircb_nick) && ($2 == "NICK") {
-	ircb_nick=substr($3,2);
+	ircb_nick = substr($3, 2)
 }

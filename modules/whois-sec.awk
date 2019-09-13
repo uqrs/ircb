@@ -1,163 +1,112 @@
+# whoisec determines whether someone has identified using services
 #
-# whoisec is used to identify registered users by WHOIS-ing them and receiving their MODE.
-# use ONLY to identify users for commands(!)
+# whois_Db[nickname] = expiry_epoch
 #
+# if an entry in whois_Db is expired or doesn't exist, start dialogue with nickserv
+#
+# whoisec makes use of the peculiar loopback circuit to put commands "on hold" while
+# ircb waits for a WHOIS command.
+#
+# If a user has no valid session:
+#   put IRC message in whois_Loop => call WHOIS:
+#     => if WHOIS says user is identified: send whois_Loop command to loopback circuit, create session for user
+#     => not identified: truncate Loopback message and display an error
 BEGIN {
-	#
 	# What MODE character does the server use to identify registered users?
-	#
-	whoisec_mode="r";
+	whoisec_mode = "r"
 
-	#
-	# Default session length?
-	#
-	whoisec_sessionlength=300;
+	# session length?
+	whoisec_sessionlength = 300
 
-	#
-	# whois database for caching
-	#
-	array(whois_Db);
+	split("",whois_Db)
 
-	#
 	# buffers for re-executing commands & recognising unidentified users
-	#
-	array(whois_Call);
-	array(whois_Cont);
-	array(whois_Envi);
-	array(whois_Extr);
+	split("",whois_Loop)
+	split("",whois_Cont)
+	split("",whois_Chan)
+	split("",whois_Extr)
+
+	WHOIS_IDENTIFIED = 0
+	WHOIS_UNIDENTIFIED = 1
+	WHOIS_RACE = 3
+	WHOIS_VALIDSESSION = 0
+	WHOIS_EXPIREDSESSION = 2
 }
 
-#
-# top-level function; "is the user identified?"
-# needs: username (USER), command ($0), context (module name), environment (channel) and extra (extra info);
-#
-# returns: `0` on identified user.
-#          `1` on invalid or race condition.
-#
-function whois_Whois(who,command,context,environment,extra){
-	#
-	# we identify users case-insensitively
-	#
-	who=tolower(who);
+function whois_Whois(who, loop_msg, context, channel, extra_notif){
+	who = tolower(who)
 
-	if ( whois_validsession(who) == 0 ) {
-		#
-		# user is identified.
-		#
-		whois_Db[who]=int(sys("date +%s"))+whoisec_sessionlength;
-		return 0;
+	if (whois_validsession(who) == WHOIS_VALIDSESSION) {
+		whois_Db[who] = int(sys("date +%s")) + whoisec_sessionlength
+		return WHOIS_IDENTIFIED
 	} else {
-		if ( who in whois_Call ) {
-			#
-			# race condition triggered; ignore new command.
-			#
-			return 1;
+		if (who in whois_Loop) {
+			return WHOIS_RACE
+		} else {
+			# invalid/no session
+			whois_Loop[who] = loop_msg
+			whois_Cont[who] = context
+			whois_Chan[who] = channel
+			whois_Extr[who] = extra_notif
+
+			send("WHOIS " who)
+
+			return WHOIS_UNIDENTIFIED
 		}
-		#
-		# this user is not identified. cache relevant information.
-		#
-		whois_Call[who]=command;
-		whois_Cont[who]=context;
-		whois_Envi[who]=environment;
-		whois_Extr[who]=extra;
-
-		#
-		# execute WHOIS command:
-		#
-		send("WHOIS " who);
-
-		return 1;
 	}
 }
 
-#
-# verify if the user session is still valid
-#
-# returns: `0` on identified user.
-#          `1` on unidentifier user.
-#          `2` on expired session.
-#
 function whois_validsession(who){
-	if ((who in whois_Db) == 0) {
-		#
-		# user is not identified
-		#
-		return 1;
-	} else if ( int(sys("date +%s")) >= (whois_Db[who])  ) {
-		delete whois_Db[who];
-		#
-		# user's session has expired
-		#
-		return 2;
+	if (!(who in whois_Db)) {
+		return WHOIS_UNIDENTIFIED
+	} else if (int(sys("date +%s")) >= whois_Db[who]) {
+		delete whois_Db[who]
+		return WHOIS_EXPIREDSESSION
 	} else {
-		#
-		# user is identified
-		#
-		return 0;
+		return WHOIS_VALIDSESSION 
 	}
 }
-#
-# request WHOIS info from the user and cache this
-#
-function whois_getwhois(who){
-	send("WHOIS " who);
-}
 
-function whois_verify(who) {
-	who=tolower(who);
+function whois_verify(who,    status) {
+	who = tolower(who)
 
 	if (who in whois_Db) {
-		#
-		# the user is identified. re-evaluate their command.
-		#
-		send("PRIVMSG " ircb_nick " :" whois_Call[who]);
+		send("PRIVMSG " ircb_nick " :" whois_Loop[who])
+		status = WHOIS_IDENTIFIED
 	} else {
-		#
-		# the user wasn't identified.
-		#
-		send("PRIVMSG " whois_Envi[who] " :[" whois_Cont[who] " => whois-sec] fatal: user '" $4 "' has not authenticated with services " whois_Extr[who]);
+		send("PRIVMSG " whois_Chan[who] " :[" whois_Cont[who] " => whois-sec] fatal: user '" $4 "' has not authenticated with services " whois_Extr[who])
+		status = WHOIS_UNIDENTIFIED
 	}
-	delete whois_Envi[who];
-	delete whois_Cont[who];
-	delete whois_Call[who];
-	delete whois_Extr[who];
+	delete whois_Chan[who]
+	delete whois_Cont[who]
+	delete whois_Loop[who]
+	delete whois_Extr[who]
+
+	return status
 }
 
-#
-# expire a users' session.
-#
 function whois_expire(who) {
-	delete whois_Db[tolower(who)];
+	delete whois_Db[tolower(who)]
 }
 
-#
-# catch "whois" response that shows the user is identified.
-## you may need to modify this entire block; your ircd may not use `307` to show that a user was identified.
-## you may even need to completely modify this script to use MODE instead of WHOIS.
-## expecting: END OF WHOIS = 318; IS IDENTIFIED FOR NICK = 307
-## MODIFY THESE OR WRITE A DIFFERENT IMPLEMENTATION(!)
-#
+## expect:
+## END OF WHOIS = 318 
+## IS IDENTIFIED FOR NICK = 307
 ($2 == "307") {
-	#
-	# the user who is identified is stored in `$4`	
-	# given the fact that a user has just been identified; we're renewing their session
-	#
-	whois_Db[tolower($4)]=(int(sys("date +%s")) + whoisec_sessionlength);
+	whois_Db[tolower($4)] = int(sys("date +%s")) + whoisec_sessionlength
 }
 
-# 
-# end of whois; moment of truth: are they identified or not?
-#
+# END-OF-WHOIS
 ($2 == "318") {
-	whois_verify($4);
+	whois_verify($4)
 }
 
-#
-# automatically expire a user's session when:
-#   - they change nicks
-#   - they leave a channel
-#   - they quit from irc
-#
-($2 == "NICK") {whois_expire(USER);}
-($2 == "PART") {whois_expire(USER);}
-($2 == "QUIT") {whois_expire(USER);}
+($2 == "NICK") {
+	whois_expire(USER)
+}
+($2 == "PART") {
+	whois_expire(USER)
+}
+($2 == "QUIT") {
+	whois_expire(USER)
+}

@@ -5,165 +5,116 @@
 # this module is optional, and may be employed by other modules (such as `db-interface.awk`).
 #
 BEGIN {
-	#
-	# the modesec_Lookup array contains sub-arrays for each individual channel.
-	# each of these individual channel-arrays contain key-value pairs in the form of
 	# modesec_Lookup["#channel" "nick"] = "r", where `r` is one of ~, &, @, %, + or " ".
-	#
-	array(modesec_Lookup);
+	split("", modesec_Lookup);
 
-	#
-	# the modesec_Ranks array contains key-value pairs denoting numerical
-	# representation of various ranks. This way, to tell whether user A's rank
-	# is higher than user B's rank, one can do `modesec_Rank[a_rank] < modesec_Rank[b_rank]`
+	# to check whether b_rank is higher then a_rank:
+	# `modesec_Rank[a_rank] < modesec_Rank[b_rank]`
 	# `n` stands in for "no rank"
 	#
 	# modesec will rebuild this table if a `PREFIX` capability is delivered by the server.
-	#
-	modesec_Ranks["n"]=2;
-	modesec_Ranks["+"]=1;
-	modesec_Ranks["@"]=0;
+	modesec_Ranks["n"] = 2;
+	modesec_Ranks["+"] = 1;
+	modesec_Ranks["@"] = 0;
+	modesec_Ranklist = "@+";
 
-	#
 	# modesec_Temp: see comment on `353` vs. `366` below.
-	#
-	array(modesec_Temp);
+	split("", modesec_Temp);
 }
 
-#
-# begin populating modesec_Temp["#channel"] user-rank pairs.
+# populate modesec_Temp using $0 (353 response)
 ## you might need to modify which of the input records these functions use to identify the channel and such.
-#
-function modesec_Stage(		Individuals,namestring) {
-	namestring=substr(cut($0,6),2);
+function modesec_Stage(    Individuals, namestring) {
+	namestring = substr(cut($0, 6), 2);
 
-	split(namestring,Individuals," ");
+	split(namestring, Individuals, " ");
 
-	for ( i in Individuals ) {
-		if ( Individuals[i] ~ /^[~&@%+]/ ) {
-			modesec_Temp[$5 " " substr(Individuals[i],2)]=substr(Individuals[i],1,1);
+	for (i in Individuals) {
+		if (Individuals[i] ~ "^[" modesec_Ranklist "]") {
+			modesec_Temp[$5 " " substr(Individuals[i],2)] = substr(Individuals[i], 1, 1);
 		} else {
-			#
-			# "n" stands in for "no rank"
-			#
-			modesec_Temp[$5 " " Individuals[i]]="n";
+			modesec_Temp[$5 " " Individuals[i]] = "n"
 		}
 	}
 }
 
-#
-# move everything from modesec_Temp["#channel"] over to modesec_Lookup["#channel"],
-# nuking the former in the process.
-#
-# `Channel` must be a `modesec_Temp["#channel"]` array.
-#
+# move modesec_Temp's contents to modesec_Lookup (called after a 366 response)
 function modesec_Commit() {
-	for ( i in modesec_Lookup ) {
-		if ( i ~ ("^" $4 " ") ) {
+	for (i in modesec_Lookup) {
+		if (i ~ ("^" $4 " ")) {
 			delete modesec_Lookup[i];
 		}
 	}
 
-	for ( i in modesec_Temp ) {
+	for (i in modesec_Temp) {
 		modesec_Lookup[i] = modesec_Temp[i];
 	}
 
 	delete modesec_Temp;
 }
 
-#
-# copy over permissions if they change their nick.
-#
-function modesec_Nick(	A) {
-	for ( i in modesec_Lookup ) {
-		if ( i ~ (" " USER "$") ) {
-			split(i,A," ");
-			modesec_Lookup[A[1] " " substr($3,2)] = modesec_Lookup[i];
-			delete modesec_Lookup[i];
+function modesec_Nick(    U) {
+	for (i in modesec_Lookup ) {
+		if (i ~ (" " USER "$")) {
+			split(i, U, " ");
+			modesec_Lookup[U[1] " " substr($3, 2)] = modesec_Lookup[i]
+			delete modesec_Lookup[i]
 		}
 	}
 }
 
-#
-# delete all entries for a user if they quit irc.
-#
 function modesec_Quit() {
-	for ( i in modesec_Lookup ) {
-		if ( i ~ (" " USER "$") ) {
-			delete modesec_Lookup[i];
+	for (i in modesec_Lookup) {
+		if (i ~ (" " USER "$")) {
+			delete modesec_Lookup[i]
 		}
 	}
 }
 
-#
-# construct a `modesec_Ranks` table from a given PREFIX string.
-#
-function modesec_Createranks (string) {
-	delete modesec_Ranks;
+function modesec_Createranks (ranks) {
+	delete modesec_Ranks
 
-	characters=substr(string,index(string,")"i)+1);
+	modesec_Ranklist = substr(ranks, index(ranks,")"i) + 1)
 
-	for ( c=length(characters) ; c>0 ; c-- ) {
-		modesec_Ranks[substr(characters,c,1)]=(c-1);
+	for (c = length(modesec_Ranklist); c > 0; c--) {
+		modesec_Ranks[substr(modesec_Ranklist, c, 1)] = (c-1)
 	}
 
-	modesec_Ranks["n"]=length(modesec_Ranks);
+	modesec_Ranks["n"] = length(modesec_Ranks);
 }
-#
-# handle the server-capabilities message (`005`). Look through it for a `PREFIX` header.
-# if it exists, reconstruct `modesec_Ranks` using the provided ranks.
-#
+
+# parse server-caps for a 'PREFIX' capability in order to rebuild modesec_Ranks
 ($2 == "005") {
-	if ( match($0,/PREFIX=\([^) ]+\)[^ ]+/) != 0 ) {
-		modesec_Createranks(substr($0,RSTART,RLENGTH))
+	if (match($0,/PREFIX=\([^) ]+\)[^ ]+/) != 0) {
+		modesec_Createranks(substr($0, RSTART, RLENGTH))
 	}
 }
 
-#
-# when a `353` response for channel `#n` hits ircb, then ircb will populate `modesec_Temp["#n"]` with entries for each name, similar to
-# how `modesec_Lookup` works.
-# when a `366` response hits ircb, then it will copy/"commit" everything from `modesec_Temp["#n"]` to `modesec_Lookup["#n"]`.
-## you might need to modify the response codes to match NAMES and END-OF-NAMES.
+## you might need to modify the response codes to match NAMES (353) and END-OF-NAMES (366)
 ($2 == "353") {
 	modesec_Stage()
 }
 
 ($2 == "366") {
-	modesec_Commit();
+	modesec_Commit()
 }
 
-#
-# look, ok. MODE is a fucking pain in the ass to handle. I'm not going to fucking bother at this point.
-# for now it just re-requests NAMES.
-#
 ($2 == "MODE") {
-	send("NAMES " $3);
+	send("NAMES " $3)
 }
 
-#
-# remove a user's entry from the channel if they leave.
-#
 ($2 == "PART") {
-	delete modesec_Lookup[$3 " " USER];
+	delete modesec_Lookup[$3 " " USER]
 }
 
-#
-# copy over permissions if they change their nick.
-#
 ($2 == "NICK") {
-	modesec_Nick();
+	modesec_Nick()
 }
 
-#
-# add a non-ranked entry in the lookup table if someone joins.
-#
 ($2 == "JOIN") {
-	modesec_Lookup[substr($3,2) " " USER]=" ";
+	modesec_Lookup[substr($3,2) " " USER]=" "
 }
 
-#
-# iterate through every channel, and remove entries for the user if they exist.
-#
 ($2 == "QUIT") {
-	modesec_Quit();
+	modesec_Quit()
 }

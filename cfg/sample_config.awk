@@ -16,6 +16,7 @@ BEGIN {
 	#
 	### boot_Commands[1] = "JOIN #channel";
 	### boot_Commands[2] = "PRIVMSG #channel :ircb v1.0 // http://github.com/uqrs/ircb
+	### boot_passfile = "cfg/nspass"
 
 	# variables pertaining to:
 	#   - tell.awk

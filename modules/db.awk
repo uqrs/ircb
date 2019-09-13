@@ -1,189 +1,138 @@
-###
-# 'database' manager; used to store entries of arbitrary length.
+# `modules/db.awk`
+# store, retrieve and search for arbitrary lines in a file (""database"")
 #
-# the db_Get function will retrieve the database entry for line `line`. The line will automatically
-# be dissected and inserted into Arr
+# "fields" in a databse are delimited using `\x1E` (record separator)
+# rows in a database are delimited by NL
 #
-# the db_Get function will retrieve the database entry for line `line`. The line will automatically
-# be dissected and inserted into Arr
+# TODO: add support for specifying different delimiters
 #
-# conventions:
-#	every function except for `db_Dissect` accepts `db` as its first argument.
-#	`db` here is one of the values from `db_Persist` (i.e. a path).
-#
-#	`line` always refers to a line number in a given database file.
-#	to discover the number for a line based on a field, use `db_Search()`.
-#
-# returns: `l` the retrieved line on success.
-#          `1` if no line was found.
-#
-function db_Get(db,line,		c,l){
-	while ((getline l < db) > 0) {
-		if (++c==line){close(db);return l}
+# individual entries are identified by line number.
+BEGIN {
+	# exit codes
+	DB_SUCCESS = 0
+
+	DB_OUTOFRANGE = -1
+
+	DB_NORESULTS = -1
+	DB_BADMODE = -2
+
+	DB_FIXED = 0
+	DB_REGEX = 1
+	DB_EXACT = 2
+
+	DB_NORMAL = 1
+	DB_INVERT = 0
+}
+
+function db_Get (dbf, target,    c, line) {
+	while ((getline line < dbf) > 0) {
+		if (++c == target) {
+			close(dbf)
+			return line
+		}
 	}
-	#
-	# if 'l' was not returned, then that means no line was found. 
-	#
-	close(db);
-	return 1;
+
+	close(dbf)
+	return DB_OUTOFRANGE
 }
 
-#
-# db_Dissect will take an individual entry line and dissect it into array Arr.
-#
-function db_Dissect(line,Arr){
-	split(line,Arr,"\x1E");
-
-	return 0;
+function db_Dissect (line, Fields) {
+	return split(line, Fields, "\x1E");
 }
 
+# db_Search looks for lines where the given field matches the search criteria.
+# the line numbers of matching are deposited into `Matches`
 #
-# db_Search will scour a database for a line where field `field` has value `value`
-# it populates the given array `Matches` with line numbers.
+# `mode` may be:
+#    DB_FIXED - for fixed-string searching
+#    DB_EXACT - for exact string matching
+#    DB_REGEX - for regular expression search
 #
-# `mode` may be 0 for a regular word-search, 1 for a regex search, or 2 for exact-matching.
-# `invert` may be 1 for non-matching, or 0 for matching.
+# `invert` may be:
+#    DB_NORMAL - for regular search
+#    DB_INVERT - look for non-matching strings
 #
-# returns: `0` if at least one match was found
-#          `1` if none were found
-#
-function db_Search(db,field,search,mode,invert,Matches,		Parts,line,count){
-	array(Parts);
+# returns:
+#    DB_SUCCESS - at least one match found
+#    DB_NORESULTS - no matches found
+function db_Search(dbf, field, query, mode, invert, Matches,    Fields, line, i) {
+	split("", Fields)
 
-	invert || (invert=0);
-	#
-	# if mode is `0`, perform a regular search.
-	#
-	if ( mode == 0 ) {
-		while ((getline l < db) > 0){
-			count++;
-			db_Dissect(l,Parts);
-			if ((tolower(Parts[field]) ~ tolower(rsan(search))) == !invert) {Matches[length(Matches)+1]=count;}
+	if (invert == "")
+		invert = DB_NORMAL
+
+	if (mode == DB_FIXED) {
+		while ((getline line < dbf) > 0) {
+			i++
+			db_Dissect(line, Fields)
+			if ((tolower(Fields[field]) ~ tolower(rsan(query))) == invert) {
+				Matches[length(Matches)+1] = i
+			}
 		}
-	} else
-	#
-	# else, if it's `2`, perform a word-match
-	#
-	if ( mode == 2) {
-		while ((getline l < db) > 0){
-			count++
-			db_Dissect(l,Parts);
-			if ((tolower(Parts[field]) == tolower(search)) == !invert) {Matches[length(Matches)+1]=count;}
+	} else if (mode == DB_EXACT) {
+		while ((getline line < dbf) > 0) {
+			i++
+			db_Dissect(line, Fields)
+			if ((tolower(Fields[field]) == tolower(query)) == invert) {
+				Matches[length(Matches)+1] = i
+			}
 		}
-	#
-	# otherwise, perform a regex search
-	#
+	} else if (mode == DB_REGEX) {
+		while ((getline line < dbf) > 0) {
+			i++
+			db_Dissect(l, Fields)
+
+			if ((tolower(Fields[field]) ~ tolower(query)) == invert) {
+				Matches[length(Matches)+1] = i
+			}
+		}
 	} else {
-		while ((getline l < db) > 0) {
-			count++;
-			db_Dissect(l,Parts);
-
-			if ((tolower(Parts[field]) ~ tolower(search)) == !invert) {Matches[length(Matches)+1]=count;}
-		}
+		return DB_BADMODE
 	}
 
-	close(db);
-	#
-	# if no matches were found, return an erroneous exit status.
-	#
-	if (length(Matches) == 0) {return 1}
-	else                      {return 0};
+	close(dbf)
+
+	if (length(Matches) == 0)
+		return DB_NORESULTS 
+	else
+		return DB_SUCCESS
 }
 
-#
-# db_Update will modify the entry for line `l`.
-# It accepts a few arguments:
-#	`db`   is the database in question to be edited
-#	`line` is the line in question that should be updated.
-#	`new`  is the new, full database entry that should be written in the place of the previous.
-#
-# Aside from these two parameters, db_Update() will also update the edit date.
-# This function does not add new entries, it only updates existing ones.
-#
-function db_Update(db,line,new,		Parts,l,count,date,tempfile){
-	array(Parts);
-	date=sys("date +%s");
-	tempfile=("/tmp/ircb-db-" rand()*1000000);
+# db_Update replaces the target line with string `new`
+function db_Update(dbf, target, new,    line, count, tmpf) {
+	tmpf = ("/tmp/ircb-db-" rand()*1000000)
 
-	#
-	# keep reading lines from the database file, copying them over to a temporary file
-	# when we hit our target line `line`, we modify it.
-	#
-	while ((getline l < db) > 0) {
-		#
-		# we've hit our match. modify it.
-		#
-		if (++count==line){
-			l=new;
+	while ((getline line < dbf) > 0) {
+		if (++count == target) {
+			line = new
 		}
-		#
-		# write our new line to the temporary file.
-		#
-		print l >> tempfile;
+
+		print line >> tmpf;
 	}
-	close(db);
-	close(tempfile);
-	#
-	# finally, overwrite the old database.
-	#
-	sys(                                            \
-	    sprintf(                                    \
-			"mv '%s' '%s' 2>/dev/null",	\
-			tempfile,			\
-			db				\
-		)					\
-	)
+	close(dbf)
+	close(tmpf)
 
-	return 0;
+	return sys(sprintf("mv '%s' '%s' 2>/dev/null", tmpf, dbf))
 }
 
-#
-# db_Add will allocate a new entry into the database file.
-# It accepts a few arguments:
-#	`db`		as the database the new entry should be stored in.
-#	`new`		as the new entry to be written to the database.
-function db_Add(db,new){
-	print new >> db ; close(db);
+function db_Add(dbf, new) {
+	print new >> dbf
+	close(dbf)
 
-	return 0;
+	return DB_SUCCESS
 }
 
-#
-# db_Remove will remove a line from the database file.
-# It accepts a few arguments:
-#	`db`		as the database the entry should be removed from.
-#	`line`		as the line in question to be removed.
-#
-function db_Remove(db,line,	c,l){
-	date=sys("date +%s");
-	tempfile=("/tmp/ircb-db-" rand()*1000000);
-	#
-	# keep reading lines from the database file, copying them over to a temporary file
-	# when we hit our target line `line`, we skip without writing it.
-	#
-	while ((getline l < db) > 0) {
-		#
-		# as long as we're not hitting our match, keep writing.
-		#
-		if (++count!=line){
-			#
-			# write our new line to the temporary file.
-			#
-			print l >> tempfile;
+# using a similar tactic to db_Update, remove a line from the db.
+function db_Remove(dbf, target,    c, line, tmpf) {
+	tmpf = ("/tmp/ircb-db-" rand()*1000000);
+
+	while ((getline line < dbf) > 0) {
+		if (++c != target) {
+			print line >> tmpf
 		}
 	}
-	close(db);
-	close(tempfile);
-	#
-	# finally, overwrite the old database.
-	#
-	sys(                                            \
-	    sprintf(                                    \
-			"mv '%s' '%s' 2>/dev/null",	\
-			tempfile,			\
-			db				\
-		)					\
-	)
+	close(dbf)
+	close(tmpf)
 
-	return 0;
+	return sys(sprintf("mv '%s' '%s' 2>/dev/null", tmpf, dbf))
 }

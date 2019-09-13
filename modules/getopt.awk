@@ -11,14 +11,31 @@
 #                `3` on unterminated string (Out[0] = the option this invalid string was for).
 #                `0` on no errors
 #
-function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT_OPT,OPT_END,OPT_ACCEPT_TEMP,OPT_ACCEPT,TERMINATOR,TERMINATOR_LOC,CURRENT_ARG) {
-	POSITION=1;
-	REMAINDER=(input " ");
-	CURRENT_OPT="--"
-	CHAR;
-	array(OPT_ARR);
-	array(Out);
+BEGIN {
+	GETOPT_INVALID = 1
+	GETOPT_NOFLAG = 2
+	GETOPT_BADQUOTE = 3
+	GETOPT_SUCCESS = 0
+	GETOPT_NEITHER = 1
+	GETOPT_COLLISION = 2
+	GETOPT_INCOMPATIBLE = 1
 
+	STDOPT = "--"
+	GETOPT_EMPTY = ""
+}
+
+
+function getopt_Getopt(input, accept, Out,	POSITION, OPT_ARR, REMAINDER, CHAR, CURRENT_OPT, OPT_END, OPT_ACCEPT_TEMP, OPT_ACCEPT, TERMINATOR, TERMINATOR_LOC, CURRENT_ARG) {
+	POSITION = 1;
+	REMAINDER = (input " ");
+	CURRENT_OPT = "--"
+	CHAR;
+	split("",OPT_ARR);
+	split("",Out);
+
+	if (input ~ /^\s*$/) {
+		return GETOPT_SUCCESS
+	}
 	#
 	# parse the 'accept' arguments into an array so that:
 	#    OPT_ACCEPT[<option>] = <: or ' '>
@@ -82,7 +99,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 				#
 				# just a lone `-` with no options behind it.
 				#
-				return 2;
+				return GETOPT_NOFLAG;
 			} else {
 				#
 				# get the list of options and go through these one-by-one.
@@ -99,7 +116,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 						# option is not accepted; throw a fit:
 						#
 						Out[0]=OPT_ARR[OPT];
-						return 1;
+						return GETOPT_INVALID;
 					} else {
 						Out[OPT_ARR[OPT]]="";
 						if ( OPT_ACCEPT[OPT_ARR[OPT]] == ":" ) {
@@ -122,7 +139,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 			#
 			# return pre-emptively if no matching quotes were found.
 			#
-			if (TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return 3;}
+			if (TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return GETOPT_BADQUOTE;}
 
 			#
 			# keep looking for backslashes until we find no more
@@ -144,7 +161,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 					# if no terminator was found, we have an error:
 					# no matching close-brace found.
 					#
-					if ( TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return 3;}
+					if ( TERMINATOR_LOC == 0 ) {Out[0]=CURRENT_OPT;return GETOPT_BADQUOTE;}
 				}
 			}
 			Out[CURRENT_OPT]=Out[CURRENT_OPT] " " CURRENT_ARG substr(REMAINDER,1,TERMINATOR_LOC-1);
@@ -162,7 +179,7 @@ function getopt_Getopt(input,accept,Out,	POSITION,OPT_ARR,REMAINDER,CHAR,CURRENT
 		sub(/^ */,"",Out[i]);
 	};
 
-	return 0;
+	return GETOPT_SUCCESS;
 }
 #
 # scour through Options, checking to make sure only one flag specified in `which` is present.
@@ -186,7 +203,7 @@ function getopt_Either(Options,which,		found) {
 				#
 				Options[0] =found;
 				Options[-1]=i;
-				return 2;
+				return GETOPT_COLLISION;
 			}
 			#
 			# found a flag
@@ -197,8 +214,8 @@ function getopt_Either(Options,which,		found) {
 	#
 	# exit code
 	#
-	if (found) {Options[0]=found;return 0;} 
-	else       {return 1;}
+	if (found) {Options[0]=found;return GETOPT_SUCCESS;} 
+	else       {return GETOPT_NEITHER;}
 }
 
 #
@@ -207,7 +224,7 @@ function getopt_Either(Options,which,		found) {
 # returns: `0` on none-found (Options[0] = "");
 #          `1` on one-found  (Options[0] = the found flag);
 #
-function getopt_Uncompatible(Options,which) {
+function getopt_Incompatible(Options,which) {
 	#
 	# turn `which` into a regex.
 	#
@@ -219,11 +236,11 @@ function getopt_Uncompatible(Options,which) {
 			# found a blacklisted flag!
 			#
 			Options[0]=i;
-			return 1;
+			return GETOPT_INCOMPATIBLE;
 		}
 	}
 	#
 	# no blacklisted flags found...
 	#
-	return 0;
+	return GETOPT_SUCCESS;
 }
