@@ -146,6 +146,7 @@ BEGIN {
 	dbinterface_Msg["opt-no-perms"] = "PRIVMSG %s :[%s] fatal: must specify new permission strings."
 	dbinterface_Msg["opt-no-owner"] = "PRIVMSG %s :[%s] fatal: must specify a new owner."
 	dbinterface_Msg["opt-no-tag"] = "PRIVMSG %s :[%s] fatal: must specify a new tag."
+	dbinterface_Msg["opt-nan"] = "PRIVMSG %s :[%s] fatal: Option `%s` expected a number, got '%s' instead."
 
 	# non-error results
 	dbinterface_Msg["query-no-results"] = "PRIVMSG %s :[%s] fatal: no results for query '%s' in database `%s`."
@@ -394,9 +395,7 @@ function dbinterface_Query_search(Options,    success, mode, Results, Fields, db
 		send(sprintf(dbinterface_Msg["opt-conflict"],
 			$3, "db => query-search", "-" Options[0], "-" Options[-1]))
 		return -3
-	}
-
-	else if (success == GETOPT_NEITHER) {
+	} else if (success == GETOPT_NEITHER) {
 		Options[DBOPT_PAGE] = 1
 		Options[0] = DBOPT_PAGE
 	}
@@ -404,6 +403,10 @@ function dbinterface_Query_search(Options,    success, mode, Results, Fields, db
 	if (Options[Options[0]] == GETOPT_EMPTY) {
 		send(sprintf(dbinterface_Msg["opt-noarg"],
 			$3, "db => query-search", Options[0]))
+		return -4
+	} else if (Options[Options[0]] !~ /^[0-9]+$/) {
+		send(sprintf(dbinterface_Msg["opt-nan"],
+		     $3, "db => query-search", "-" Options[0], Options[Options[0]]))
 		return -4
 	}
 
