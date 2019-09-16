@@ -80,7 +80,7 @@ function db_Search(dbf, field, query, mode, invert, Matches,    Fields, line, i)
 	} else if (mode == DB_REGEX) {
 		while ((getline line < dbf) > 0) {
 			i++
-			db_Dissect(l, Fields)
+			db_Dissect(line, Fields)
 
 			if ((tolower(Fields[field]) ~ tolower(query)) == invert) {
 				Matches[length(Matches)+1] = i
