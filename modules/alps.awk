@@ -104,7 +104,7 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 
 	Curl_headers["accept"] = "application/json"
 
-	curl_get(Output, ALPS_URL, Curl_headers, Curl_data)
+	curl_Get(Output, ALPS_URL, Curl_headers, Curl_data)
 
 
 

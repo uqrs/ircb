@@ -1,16 +1,15 @@
-# netcat socket i/o library for one-off calls
 BEGIN {
 	curl_bin = "curl"
 	curl_flags = "-s"
 
-	CURL_SUCCESS = 0
 	CURL_ERROR = 1
+	CURL_SUCCESS = 0
 }
 
-function curl_get (Output,url,Headers,Data)
+function curl_compose (url, Headers, Data)
 {
 	c = sprintf("%s -G %s --request GET --url '%s'",
-		curl_bin, curl_flags, san(url))
+		curl_bin, curl_flags, san(url), pipe)
 
 	for (h in Headers) {
 		if (Headers[h] != "")
@@ -27,7 +26,12 @@ function curl_get (Output,url,Headers,Data)
 			c = (c " --data-urlencode '" san(Data[d]) "'")
 	}
 
-	lsys(c, Output)
+	return c
+}
+
+function curl_Get (Output, url, Headers, Data)
+{
+	lsys(curl_compose(url, Headers, Data), Output)
 
 	if (length(Output) == 0)
 		return CURL_ERROR
