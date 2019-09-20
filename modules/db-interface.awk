@@ -794,7 +794,7 @@ function dbinterface_Remove(Options,	Results, db, success, line) {
 	dbf = db_Persist[db]
 	success = db_Search(dbf, DBF_LABEL, Options[STDOPT], DB_EXACT, DB_NORMAL, Results)
 
-	if (success == GETOPT_NORESULTS) {
+	if (success == DB_NORESULTS) {
 		send(sprintf(dbinterface_Msg["query-not-found"],
 			$3, "db => remove", Options[STDOPT], db))
 		return -3
