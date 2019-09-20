@@ -185,7 +185,7 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 	if (dbinterface_Use[$3] in dbinterface_Authority) {
 		secure = 1
 		if (whois_Whois(USER, $0, "db-interface", $3, "(authority for " db ": " $3 ")") == WHOIS_UNIDENTIFIED) {
-			return -2
+			return WHOIS_UNIDENTIFIED
 		}
 	} else {
 		secure = 0
@@ -841,5 +841,7 @@ function dbinterface_Resolveperms(db,Fields,perm,	effective_rank) {
 }
 
 ($2 == "PRIVMSG") && ($4 ~ /^::db$/) {
-	dbinterface_Db($0)
+	if (dbinterface_Db($0) == WHOIS_UNIDENTIFIED) {
+		next	
+	}
 }

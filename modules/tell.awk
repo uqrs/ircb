@@ -77,8 +77,11 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 	if (length($6) == 0) {
 		send("PRIVMSG " $3 " :[tell] Usage: tell [recipient] [message]")
 	} else if (tell_secure == "yes") {
-		if (whois_Whois(USER, $0, "tell => send", $3, "(tell_secure=yes)") == 0)
+		if (whois_Whois(USER, $0, "tell => send", $3, "(tell_secure=yes)") == WHOIS_IDENTIFIED) {
 			tell_Add()
+		} else {
+			next
+		}
 	} else {
 		tell_Add()
 	}
@@ -88,6 +91,8 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 	if (tell_secure == "yes") {
 		if (whois_Whois(USER,$0,"tell => get",$3,"(tell_secure=yes)") == WHOIS_IDENTIFIED) {
 			tell_Sendall()
+		} else {
+			next	
 		}
 	} else {
 		tell_Sendall()

@@ -39,6 +39,7 @@ function url_headers(url, Output,    c, t, i, loc) {
 	for (i in Output) {
 		loc = index(Output[i]," ")
 		Output[tolower(substr(Output[i],1,loc-1))] = tolower(substr(Output[i],loc+1))
+		gsub(/[\n\r]/, "", Output[tolower(substr(Output[i],1,loc-1))])
 	}
 
 	return CURL_SUCCESS
@@ -53,7 +54,7 @@ function url_Url(msg,    success, t, L, f, c, i, url)
 
 		if (int(L["content-length:"]) > url_maxsize) {
 			send(sprintf(url_Msg["large"],
-			     $3, "url => detect", L["content-length:"], L["content-type:"], url_maxsize))
+			     $3, "url => detect", L["content-type:"], L["content-length:"], url_maxsize))
 		} else if (L["content-type:"] ~ /text\/html/) {
 			t = url_htmltitle(url)
 
