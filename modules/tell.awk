@@ -6,7 +6,7 @@ BEGIN {
 	#   [recipient] [sender] [date] [message]\n
 
 	# use whois-sec to identify recipients and senders?
-	tell_secure = "yes"
+	tell_secure = 1
 
 	# cache the amount of tells someone has stored
 	#   tell_Cache[user] = number
@@ -49,8 +49,8 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 	tell_clearcache(USER)
 	split("",Tells)
 
-	lsys(sprintf( \
-	     "sed -Ei '/^%s /I { w /dev/stdout\nd }' '%s'", USER, tell_persist), Tells)
+	lsys(sprintf("sed -Ei '/^%s /I { w /dev/stdout\nd }' '%s'",
+	     USER, tell_persist), Tells)
 
 	if (Tells[1] == "")
 		return
@@ -76,11 +76,13 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 ($2 == "PRIVMSG") && ($4 ~ /^::(t|tell)$/) {
 	if (length($6) == 0) {
 		send("PRIVMSG " $3 " :[tell] Usage: tell [recipient] [message]")
-	} else if (tell_secure == "yes") {
-		if (whois_Whois(USER, $0, "tell => send", $3, "(tell_secure=yes)") == WHOIS_IDENTIFIED) {
+
+	} else if (tell_secure) {
+		if (whois_Whois(USER) == WHOIS_IDENTIFIED) {
 			tell_Add()
 		} else {
-			next
+			send(sprintf("PRIVMSG %s :[tell => send] fatal: user '%s' has not authenticated with services. (tell_secure = yes)",
+			     $3, USER))
 		}
 	} else {
 		tell_Add()
@@ -88,11 +90,12 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 }
 
 ($2 == "PRIVMSG") && ($4 ~ /^::(showtells)$/) {
-	if (tell_secure == "yes") {
-		if (whois_Whois(USER,$0,"tell => get",$3,"(tell_secure=yes)") == WHOIS_IDENTIFIED) {
+	if (tell_secure) {
+		if (whois_Whois(USER) == WHOIS_IDENTIFIED) {
 			tell_Sendall()
 		} else {
-			next	
+			send(sprintf("PRIVMSG %s :[tell => show] fatal: user '%s' has not authenticated with services. (tell_secure = yes)",
+			     $3, USER))
 		}
 	} else {
 		tell_Sendall()

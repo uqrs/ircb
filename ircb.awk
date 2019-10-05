@@ -57,6 +57,17 @@
 #
 # for help and support with irc, read: https://tools.ietf.org/html/rfc2812
 # for help and support with awk, read: awk(1)
+BEGIN {
+    # TODO: hacky, configuration is not respected.
+    ircb_nick = "ircb"
+    ircb_user = "ircb"
+    ircb_realname = "irc-bot"
+
+    send("NICK " ircb_nick)
+    send("USER " ircb_user " * 0 :" ircb_realname)
+}
+
+
 function send (msg) {
 	print (msg "\r\n")
 	fflush()
@@ -76,11 +87,13 @@ function lsys (syscall, Lines,    stdout) {
 	return Lines[1]
 }
 
+# sanitise shell strings
 function san (string) {
 	gsub(/'/, "'\\''", string)
 	return string
 }
 
+# sanitise regular expressions
 function rsan (string) {
 	gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/, "\\\\&", string)
 	return string
@@ -104,7 +117,7 @@ function cut (string, begin, end, delim, out_delim,    subs, Array) {
     return subs
 }
 
-# assemble substring from fields `begin` to `end` in array `Array`
+# assemble substring from fields `begin` to `end` using array `Array`
 function acut(Array, begin, end, out_delim,    subs) {
     if (!end)
 	    end = length(Array)
@@ -118,18 +131,17 @@ function acut(Array, begin, end, out_delim,    subs) {
     return subs
 }
 
-BEGIN {
-    # TODO: hacky, configuration is not respected.
-    ircb_nick = "ircb"
-    ircb_user = "ircb"
-    ircb_realname = "irc-bot"
-
-    send("NICK " ircb_nick)
-    send("USER " ircb_user " * 0 :" ircb_realname)
+function loop(m) {
+	send(sprintf("PRIVMSG %s :%s",
+	     ircb_nick, m))
 }
 
 {
     gsub(/[\r\n]+/, "")
+}
+
+($1 == "PING") {
+    send("PONG " substr($2, 2))
 }
 
 # USER is nick of the user who sent the command, if appliccable.
@@ -138,9 +150,6 @@ BEGIN {
     USER = substr($1, 2, RLENGTH-2)
 }
 
-($1 == "PING") {
-    send("PONG " substr($2, 2))
-}
 
 # for private correspondence, $3 will be changed from our own nick to the sender's nick
 ($3 == ircb_nick) && ($2 == "PRIVMSG") {

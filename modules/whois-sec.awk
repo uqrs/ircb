@@ -1,8 +1,8 @@
 # whoisec determines whether someone has identified using services
 #
-# whois_Db[nickname] = expiry_epoch
+# whois_Session[nickname] = expiry_epoch
 #
-# if an entry in whois_Db is expired or doesn't exist, start dialogue with nickserv
+# if an entry in whois_Session is expired or doesn't exist, start dialogue with nickserv
 #
 # whoisec makes use of the peculiar loopback circuit to put commands "on hold" while
 # ircb waits for a WHOIS command.
@@ -12,71 +12,81 @@
 #     => if WHOIS says user is identified: send whois_Loop command to loopback circuit, create session for user
 #     => not identified: truncate Loopback message and display an error
 BEGIN {
-	# What MODE character does the server use to identify registered users?
-	whoisec_mode = "r"
+	# config vars
+	whois_sessionlength = 300
 
-	# session length?
-	whoisec_sessionlength = 300
+	# global module vars
+	split("", whois_Session)
 
-	split("",whois_Db)
-
-	# buffers for re-executing commands & recognising unidentified users
-	split("",whois_Loop)
-	split("",whois_Cont)
-	split("",whois_Chan)
-	split("",whois_Extr)
-
+	# macros
 	WHOIS_IDENTIFIED = 0
 	WHOIS_UNIDENTIFIED = 1
-	WHOIS_RACE = 3
 	WHOIS_VALIDSESSION = 0
 	WHOIS_EXPIREDSESSION = 2
 }
 
-function whois_Whois(who, loop_msg, context, channel, extra_notif){
+function whois_Whois(who,    old, i, B) {
 	who = tolower(who)
 
-	if (whois_validsession(who) == WHOIS_VALIDSESSION) {
-		whois_Db[who] = int(sys("date +%s")) + whoisec_sessionlength
+	if (whois_session(who) == WHOIS_VALIDSESSION) {
+		whois_Session[who] = int(sys("date +%s")) + whois_sessionlength
 		return WHOIS_IDENTIFIED
+
 	} else {
-		if (who in whois_Loop) {
-			return WHOIS_RACE
-		} else {
-			# invalid/no session
-			whois_Loop[who] = loop_msg
-			whois_Cont[who] = context
-			whois_Chan[who] = channel
-			whois_Extr[who] = extra_notif
+		send("WHOIS " who)
 
-			send("WHOIS " who)
+		old = $0
+		split("", B)
 
-			return WHOIS_UNIDENTIFIED
-		}
+		## 'end of whois' = 318
+		## 'is identified for this nick' = 307
+		do {
+			getline
+
+			if ($2 !~ /^(311|319|312|671|317|318)$/)
+				B[length(B)+1] = $0
+
+			if ($2 == "307")
+				whois_Session[tolower($4)] = int(sys("date +%s")) + whois_sessionlength
+
+			sys("sleep 1")
+
+		} while ($2 != "318")
+
+		$0 = old
+
+		for (i = 1; i <= length(B); i++)
+			loop(B[i])
+
+		return whois_session(who)
 	}
 }
 
-function whois_validsession(who){
-	if (!(who in whois_Db)) {
+function whois_session(who) {
+	if (!(who in whois_Session)) {
 		return WHOIS_UNIDENTIFIED
-	} else if (int(sys("date +%s")) >= whois_Db[who]) {
-		delete whois_Db[who]
+
+	} else if (int(sys("date +%s")) >= whois_Session[who]) {
+		delete whois_Session[who]
 		return WHOIS_EXPIREDSESSION
+
 	} else {
-		return WHOIS_VALIDSESSION 
+		return WHOIS_VALIDSESSION
+
 	}
 }
 
 function whois_verify(who,    status) {
 	who = tolower(who)
 
-	if (who in whois_Db) {
+	if (who in whois_Session) {
 		send("PRIVMSG " ircb_nick " :" whois_Loop[who])
 		status = WHOIS_IDENTIFIED
+
 	} else {
-		send("PRIVMSG " whois_Chan[who] " :[" whois_Cont[who] " => whois-sec] fatal: user '" $4 "' has not authenticated with services " whois_Extr[who])
 		status = WHOIS_UNIDENTIFIED
 	}
+
 	delete whois_Chan[who]
 	delete whois_Cont[who]
 	delete whois_Loop[who]
@@ -86,19 +96,7 @@ function whois_verify(who,    status) {
 }
 
 function whois_expire(who) {
-	delete whois_Db[tolower(who)]
-}
-
-## expect:
-## END OF WHOIS = 318 
-## IS IDENTIFIED FOR NICK = 307
-($2 == "307") {
-	whois_Db[tolower($4)] = int(sys("date +%s")) + whoisec_sessionlength
-}
-
-# END-OF-WHOIS
-($2 == "318") {
-	whois_verify($4)
+	delete whois_Session[tolower(who)]
 }
 
 ($2 == "NICK") {

@@ -173,7 +173,7 @@ BEGIN {
 	dbinterface_Msg["perm-no-remove"] = "PRIVMSG %s :[%s] fatal: user `%s` is not authorized to remove entry `%s` (%s:%s)"
 }
 
-function dbinterface_Db(input,    success, argstring, Options, secure, db) {
+function dbinterface_Db(input,    success, argstring, Options, db) {
 	if (!($3 in dbinterface_Use)) {
 		send(sprintf(dbinterface_Msg["no-db"],
 		      $3, "db => query-info", $3))
@@ -183,12 +183,11 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 	db = dbinterface_Use[$3]
 
 	if (dbinterface_Use[$3] in dbinterface_Authority) {
-		secure = 1
-		if (whois_Whois(USER, $0, "db-interface", $3, "(authority for " db ": " $3 ")") == WHOIS_UNIDENTIFIED) {
+		if (whois_Whois(USER) == WHOIS_UNIDENTIFIED) {
+			send(sprintf("PRIVMSG %s :[db-interface] fatal: user '%s' has not authenticated with services. (authority for %s: %s)",
+			     $3, USER, db, $3))
 			return WHOIS_UNIDENTIFIED
 		}
-	} else {
-		secure = 0
 	}
 
 	split("", Options)
@@ -200,6 +199,7 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 		send(sprintf(dbinterface_Msg["opt-err"],
 			$3, "db => getopt", Options[0]))
 		return -3
+
 	} else {
 		success = getopt_Either(Options,"QRS")
 
@@ -207,10 +207,12 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 			send(sprintf(dbinterface_Msg["opt-neither"],
 				$3, "db => getopt", "`-Q`, `-R` or `-S`"))
 			return -4
+
 		} else if (success == GETOPT_COLLISION) {
 			send(sprintf(dbinterface_Msg["opt-conflict"],
 				$3, "db => getopt", "-" Options[0], "-" Options[-1]))
 			return -5
+
 		} else {
 			if (Options[0] == DBOPT_QUERY) {
 				success = getopt_Incompatible(Options, "waOTcCt")
@@ -226,6 +228,7 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 				if (success == GETOPT_NEITHER) {
 					dbinterface_Query_show(Options)
 					return 0
+
 				} else if (success == GETOPT_COLLISION) {
 					send(sprintf(dbinterface_Msg["opt-conflict"],
 						$3, "db => getopt", "-" Options[0], "-" Options[-1]))
@@ -234,9 +237,11 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 
 				if (Options[0] == DBOPT_SEARCH) {
 					dbinterface_Query_search(Options)
+
 				} else if (Options[0] == DBOPT_INFO) {
 					dbinterface_Query_info(Options)
 				}
+
 
 			} else if (Options[0] == DBOPT_REMOVE) {
 				success = getopt_Incompatible(Options, "QSsprfEFviwarpcCt")
@@ -245,9 +250,11 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 					send(sprintf(dbinterface_Msg["opt-invalid"],
 						$3, "db => getopt", "-" Options[0], "-R"))
 					return -6
+
 				} else {
 					dbinterface_Remove(Options)
 				}
+
 
 			} else if (Options[0] = DBOPT_WRITE) {
 				success = getopt_Incompatible(Options, "EFifv")
@@ -264,18 +271,23 @@ function dbinterface_Db(input,    success, argstring, Options, secure, db) {
 					send(sprintf(dbinterface_Msg["opt-neither-c"],
 						$3, "db => getopt", "`-w`, `-a`, `-r`, `-p`, `-c`, `-C` or `-t`", "-S"))
 					return -9
+
 				} else if (success == GETOPT_COLLISION) {
 					send(sprintf(dbinterface_Msg["opt-conflict"],
 						$3, "db => getopt", "-" Options[0], "-" Options[-1]))
 					return -10
 				}
 
+
 				if (DBOPT_CHMOD in Options)
 					dbinterface_Sync_chmod(Options)
+
 				else if (DBOPT_CHOWN in Options)
 					dbinterface_Sync_chown(Options)
+
 				else if (DBOPT_TAG in Options)
 					dbinterface_Sync_tag(Options)
+
 				else
 					dbinterface_Sync_write(Options)
 			}
@@ -324,6 +336,7 @@ function dbinterface_Query_info(Options,    Results, Fields, line, db, dbf, succ
 
 	created_at = sys("date -d '@" Fields[DBF_CREATED] "'")
 	modified_at = sys("date -d '@" Fields[DBF_MODIFIED] "'")
+
 	send(sprintf(dbinterface_Msg["query-info"],
 		$3, "db => query-info", Fields[DBF_LABEL], db, tag, Fields[DBF_OWNER],
 		Fields[DBF_EDITOR], created_at, modified_at, Fields[DBF_PERMS]))
