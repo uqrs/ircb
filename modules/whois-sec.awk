@@ -76,25 +76,6 @@ function whois_session(who) {
 	}
 }
 
-function whois_verify(who,    status) {
-	who = tolower(who)
-
-	if (who in whois_Session) {
-		send("PRIVMSG " ircb_nick " :" whois_Loop[who])
-		status = WHOIS_IDENTIFIED
-
-	} else {
-		status = WHOIS_UNIDENTIFIED
-	}
-
-	delete whois_Chan[who]
-	delete whois_Cont[who]
-	delete whois_Loop[who]
-	delete whois_Extr[who]
-
-	return status
-}
-
 function whois_expire(who) {
 	delete whois_Session[tolower(who)]
 }
