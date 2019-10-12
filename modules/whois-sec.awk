@@ -29,7 +29,7 @@ function whois_Whois(who,    old, i, B) {
 	who = tolower(who)
 
 	if (whois_session(who) == WHOIS_VALIDSESSION) {
-		whois_Session[who] = int(sys("date +%s")) + whois_sessionlength
+		whois_Session[who] = int(sh("date +%s")) + whois_sessionlength
 		return WHOIS_IDENTIFIED
 
 	} else {
@@ -47,9 +47,7 @@ function whois_Whois(who,    old, i, B) {
 				B[length(B)+1] = $0
 
 			if ($2 == "307")
-				whois_Session[tolower($4)] = int(sys("date +%s")) + whois_sessionlength
-
-			sys("sleep 1")
+				whois_Session[tolower($4)] = int(sh("date +%s")) + whois_sessionlength
 
 		} while ($2 != "318")
 
@@ -66,7 +64,7 @@ function whois_session(who) {
 	if (!(who in whois_Session)) {
 		return WHOIS_UNIDENTIFIED
 
-	} else if (int(sys("date +%s")) >= whois_Session[who]) {
+	} else if (int(sh("date +%s")) >= whois_Session[who]) {
 		delete whois_Session[who]
 		return WHOIS_EXPIREDSESSION
 

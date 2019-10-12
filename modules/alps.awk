@@ -45,12 +45,12 @@ BEGIN {
 }
 
 function alps_Search(input,    Options, argstring, success, Curl_data, Curl_headers, Output, nresults, result, mode, rmode, lstart, lend) {
-	split("",Curl_data)
-	split("",Curl_headers)
-	split("",Output)
+	split("", Curl_data)
+	split("", Curl_headers)
+	split("", Output)
 
 
-	split("",Options)
+	split("", Options)
 	argstring = cut(input, 5)
 
 	success = getopt_Getopt(argstring, "Q,N,D,R:,a:,m:,f,r:,p:", Options)
@@ -59,16 +59,20 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 		send(sprintf(alps_Msg["opt-err"],
 		     $3, "alps => getopt", Options[0]))
 		return
+
 	} else {
 		success = getopt_Either(Options, "QND")
 		if (success == GETOPT_COLLISION) {
 			send(sprintf(alps_Msg["opt-conflict"],
 			     $3, "alps => getopt", "-" Options[0], "-" Options[-1]))
 			return
+
 		} else if (success == GETOPT_NEITHER || ALPSOPT_QUERY in Options)
 			mode = "q"
+
 		else if (ALPSOPT_NAME in Options)
 			mode = "name"
+
 		else if (ALPSOPT_DESC in Options)
 			mode = "desc"
 	}
@@ -79,9 +83,10 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 		send(sprintf(alps_Msg["opt-conflict"],
 		     $3, "alps => getopt", "-" Options[0], "-" Options[-1]))
 		return
-	} else if (success == GETOPT_NEITHER) {
+
+	} else if (success == GETOPT_NEITHER)
 		Options[ALPSOPT_RESULT] = 1
-	}
+
 
 	if (Options[STDOPT] == GETOPT_EMPTY) {
 		send(sprintf(alps_Msg["opt-ns-query"],
@@ -98,7 +103,6 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 		Curl_data["arch"] = Options[ALPSOPT_ARCH]
 	if (ALPSOPT_MAINTAINER in Options)
 		Curl_data["maintainer"] = Options[ALPSOPT_MAINTAINER]
-
 	if (ALPSOPT_FLAGGED in Options)
 		Curl_data["flagged"] = "Flagged"
 
@@ -108,7 +112,7 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 
 
 
-	nresults = sys(sprintf("jq '.results | length' <<<'%s'",
+	nresults = sh(sprintf("jq '.results | length' <<<'%s'",
 	    san(Output[1])))
 
 	if (nresults == 0) {
@@ -122,15 +126,17 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 			send(sprintf(alps_Msg["opt-nan"],
 			     $3, "alps => getopt", "-" ALPSOPT_RESULT, Options[ALPSOPT_RESULT]))
 			return
+
 		} else if (Options[ALPSOPT_RESULT] < 1) {
 			send(sprintf(alps_Msg["opt-resultltz"],
 				$3, "alps => getopt", Options[ALPSOPT_RESULT]))
 			return
+
 		} else if (Options[ALPSOPT_RESULT] > nresults) {
 			Options[ALPSOPT_RESULT] = nresults
 		}
 
-		result = sys(sprintf("jq '%s' <<<'%s'",
+		result = sh(sprintf("jq '%s' <<<'%s'",
 			sprintf(ALPS_JQ_RESULT, Options[ALPSOPT_RESULT]-1), san(Output[1])))
 
 		result = substr(result, 2, length(result)-2)
@@ -144,10 +150,12 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 			send(sprintf(alps_Msg["opt-nan"],
 			     $3, "alps => getopt", "-" ALPSOPT_PAGE, Options[ALPSOPT_PAGE]))
 			return
+
 		} else if (Options[ALPSOPT_PAGE] < 1) {
 			send(sprintf(alps_Msg["opt-pageltz"],
 			     $3, "alps => getopt", Options[ALPSOPT_PAGE]))
 			return
+
 		} else if (((Options[ALPSOPT_PAGE]-1) * ALPS_PAGESIZE) > nresults) {
 			Options[ALPSOPT_PAGE] = int(nresults/ALPS_PAGESIZE)+1
 		}
@@ -155,7 +163,7 @@ function alps_Search(input,    Options, argstring, success, Curl_data, Curl_head
 		lstart = ((Options[ALPSOPT_PAGE]-1) * ALPS_PAGESIZE)
 		lend = lstart + ALPS_PAGESIZE
 
-		result = sys(sprintf("jq '%s' <<<'%s'",
+		result = sh(sprintf("jq '%s' <<<'%s'",
 		       sprintf(ALPS_JQ_PAGE, lstart, lend), san(Output[1])))
 
 		result = substr(result, 2, length(result)-2)

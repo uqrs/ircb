@@ -16,13 +16,13 @@ BEGIN {
 }
 
 function tell_cache(user) {
-	tell_Cache[user] = sys(sprintf("awk '$1 == \"%s\"' < '%s' | wc -l", user, tell_persist))
+	tell_Cache[user] = sh(sprintf("awk '$1 == \"%s\"' < '%s' | wc -l", user, tell_persist))
 }
 
 function tell_initcache(    user, Output) {
 	split("", Output)
 
-	lsys(sprintf("cut -d ' ' -f 1 <'%s' | sort | uniq",
+	lsh(sprintf("cut -d ' ' -f 1 <'%s' | sort | uniq",
 	     san(tell_persist)), Output)
 
 	for (user in Output)
@@ -36,11 +36,11 @@ function tell_clearcache(user) {
 function tell_Add(    message){
 	message = cut($0, 6)
 
-	printf("%s %s %s %s\n", $5, USER, sys("date +%s"), message) >> tell_persist
+	printf("%s %s %s %s\n", $5, USER, sh("date +%s"), message) >> tell_persist
 	close(tell_persist)
 
 	send(sprintf("PRIVMSG %s :[tell][%s => %s][@%s] Message of length (%s) queued successfully",
-		$3, USER, $5, sys("date +%s"), length(message)))
+		$3, USER, $5, sh("date +%s"), length(message)))
 
 	tell_cache($5)
 }
@@ -49,7 +49,7 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 	tell_clearcache(USER)
 	split("",Tells)
 
-	lsys(sprintf("sed -Ei '/^%s /I { w /dev/stdout\nd }' '%s'",
+	lsh(sprintf("sed -Ei '/^%s /I { w /dev/stdout\nd }' '%s'",
 	     USER, tell_persist), Tells)
 
 	if (Tells[1] == "")
@@ -59,7 +59,7 @@ function tell_Sendall(		tell, Tells, Parts, ys, ds, hs, ms, ss){
 		split(Tells[tell], Parts, " ")
 
 		# yeah uhhh fuck me
-		ss=(int(sys("date +%s") - int(Parts[3])))
+		ss=(int(sh("date +%s") - int(Parts[3])))
 		ys=(ss-(ss%31557600))/31557600
 		ss=(ss-(ys*31557600))
 		ds=(ss-((ss%31557600)%86400))/86400

@@ -31,7 +31,7 @@ function curl_compose (url, Headers, Data)
 
 function curl_Get (Output, url, Headers, Data)
 {
-	lsys(curl_compose(url, Headers, Data), Output)
+	lsh(curl_compose(url, Headers, Data), Output)
 
 	if (length(Output) == 0)
 		return CURL_ERROR

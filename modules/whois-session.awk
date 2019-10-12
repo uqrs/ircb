@@ -6,7 +6,7 @@ function whois_session_show(    who, expires_in) {
 		who = tolower(USER)
 
 	if (whois_Whois(who) == WHOIS_IDENTIFIED) {
-		expires_in = (whois_Session[who]) - sys("date +%s")
+		expires_in = (whois_Session[who]) - sh("date +%s")
 
 		send(sprintf("PRIVMSG %s :[get-session => whois-session] User '%s' is identified (SESSION_ENDS=%d) (expires in: %s)",
 			$3, who, whois_Session[who], expires_in))

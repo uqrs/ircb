@@ -112,7 +112,7 @@ function db_Update(dbf, target, new,    line, count, tmpf) {
 	close(dbf)
 	close(tmpf)
 
-	return sys(sprintf("mv '%s' '%s' 2>/dev/null", tmpf, dbf))
+	return sh(sprintf("mv '%s' '%s' 2>/dev/null", tmpf, dbf))
 }
 
 function db_Add(dbf, new) {
@@ -134,5 +134,5 @@ function db_Remove(dbf, target,    c, line, tmpf) {
 	close(dbf)
 	close(tmpf)
 
-	return sys(sprintf("mv '%s' '%s' 2>/dev/null", tmpf, dbf))
+	return sh(sprintf("mv '%s' '%s' 2>/dev/null", tmpf, dbf))
 }

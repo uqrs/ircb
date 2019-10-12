@@ -58,6 +58,9 @@
 # for help and support with irc, read: https://tools.ietf.org/html/rfc2812
 # for help and support with awk, read: awk(1)
 BEGIN {
+    # useful constants for sys() and lsys()
+    SH_WATCHDOG = "(PID=$!; sleep %d; kill \"$PID\" &>/dev/null) &"
+
     # TODO: hacky, configuration is not respected.
     ircb_nick = "ircb"
     ircb_user = "ircb"
@@ -68,18 +71,18 @@ BEGIN {
 }
 
 
-function send (msg) {
+function send(msg) {
 	print (msg "\r\n")
 	fflush()
 }
 
-function sys (syscall,    stdout) {
+function sh(syscall,    stdout) {
 	syscall | getline stdout
 	close(syscall)
 	return stdout
 }
 
-function lsys (syscall, Lines,    stdout) {
+function lsh(syscall, Lines,    stdout) {
 	while ((syscall | getline stdout) > 0) {
 		Lines[length(Lines)+1] = stdout
 	}
@@ -87,20 +90,24 @@ function lsys (syscall, Lines,    stdout) {
 	return Lines[1]
 }
 
+function watchdog(s) {
+	return sprintf(SH_WATCHDOG, s)
+}
+
 # sanitise shell strings
-function san (string) {
+function san(string) {
 	gsub(/'/, "'\\''", string)
 	return string
 }
 
 # sanitise regular expressions
-function rsan (string) {
+function rsan(string) {
 	gsub(/[\$\^\\\.\[\]\{\}\*\?\+]/, "\\\\&", string)
 	return string
 }
 
 # assemble a substring from fields `begin` to `end`
-function cut (string, begin, end, delim, out_delim,    subs, Array) {
+function cut(string, begin, end, delim, out_delim,    subs, Array) {
     if (delim == "")
 	    delim = FS
     if (out_delim == "")

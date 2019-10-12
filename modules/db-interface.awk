@@ -334,8 +334,8 @@ function dbinterface_Query_info(Options,    Results, Fields, line, db, dbf, succ
 	else
 		tag = Fields[DBF_TAG]
 
-	created_at = sys("date -d '@" Fields[DBF_CREATED] "'")
-	modified_at = sys("date -d '@" Fields[DBF_MODIFIED] "'")
+	created_at = sh("date -d '@" Fields[DBF_CREATED] "'")
+	modified_at = sh("date -d '@" Fields[DBF_MODIFIED] "'")
 
 	send(sprintf(dbinterface_Msg["query-info"],
 		$3, "db => query-info", Fields[DBF_LABEL], db, tag, Fields[DBF_OWNER],
@@ -546,7 +546,7 @@ function dbinterface_Sync_write(Options,    Results, Fields, old, date, new, wha
 	split("", Results)
 	db = dbinterface_Use[$3]
 	dbf = db_Persist[db]
-	date = sys("date +%s")
+	date = sh("date +%s")
 
 	success = db_Search(dbf, DBF_LABEL, Options[what], DB_EXACT, DB_NORMAL, Results)
 
@@ -854,7 +854,5 @@ function dbinterface_Resolveperms(db,Fields,perm,	effective_rank) {
 }
 
 ($2 == "PRIVMSG") && ($4 ~ /^::db$/) {
-	if (dbinterface_Db($0) == WHOIS_UNIDENTIFIED) {
-		next	
-	}
+	dbinterface_Db($0)
 }

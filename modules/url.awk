@@ -27,7 +27,7 @@ function url_htmltitle(url,    c, t, a, C, d, i, Output) {
 
 	c = sprintf("%s %s | %s",
 		curl_compose(url), "-L", URL_TITLEPIPE)
-	lsys(c, Output)
+	lsh(c, Output)
 
 
 	a = Output[1]
@@ -65,7 +65,7 @@ function url_headers(url, Output,    c, t, i, loc) {
 	c = sprintf("%s %s",
 	  	curl_compose(url), "-IL")
 
-	lsys(c, Output)
+	lsh(c, Output)
 
 	if (length(Output) == 0)
 		return CURL_ERROR
@@ -107,13 +107,13 @@ function url_Url(msg,    success, t, L, f, c, i, url, rs, rl)
 		} else {
 			f = url_tmpdir "ircb-" int(rand()*1000000)
 
-			i = sys(sprintf("%s %s && file %s",
+			i = sh(sprintf("%s %s && file %s",
 			    curl_compose(url), " -L --output " f, f))
 
 			send(sprintf(url_Msg["info"],
 			     $3, "url => detect", cut(i,2)))
 
-			sys(sprintf("rm %s", f))
+			sh(sprintf("rm %s", f))
 		}
 
 		msg = substr(msg, rs + rl + 1)
