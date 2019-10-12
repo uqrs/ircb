@@ -44,7 +44,7 @@ function bc_Bc(input,    Options, opts, o) {
 	if (BCOPT_POSIX in Options)
 		opts = opts " -s"
 
-	o = sh(sprintf("bc %s <<<'scale=20; %s' 2>&1 & %s",
+	o = sh(sprintf("bc %s <<<'%s' 2>&1 & %s",
 		opts, san(Options[STDOPT]), watchdog(1)))
 
 	if (o == "") {
