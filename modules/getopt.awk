@@ -111,10 +111,12 @@ function getopt_Getopt(input, accept, Output,    term, i, T, F, o, escaped, copt
 		}
 	}
 
-	if (term)
+	if (term) {
+		Output[0] = term
 		return GETOPT_BADQUOTE
-	else
+	} else {
 		return GETOPT_SUCCESS
+	}
 }
 
 function getopt_Either (Options, which,    found, i) {

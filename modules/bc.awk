@@ -13,7 +13,8 @@ BEGIN {
 	BCOPT_POSIX = "s"
 
 	bc_Msg["opt-err"] = "PRIVMSG %s :[%s] fatal: erroneous options received. [2> %s]"
-	bs_Msg["opt-no-query"] = "PRIVMSG %s :[%s] fatal: must specify a valid expression."
+	bc_Msg["opt-no-query"] = "PRIVMSG %s :[%s] fatal: must specify a valid expression."
+	bc_Msg["opt-badquote"] = "PRIVMSG %s :[%s] fatal: unterminated string (term: %s)"
 	bc_Msg["noout"] = "PRIVMSG %s :[%s] fatal: no output (killed by watchdog?)"
 	bc_Msg["output"] = "PRIVMSG %s :[%s] %s"
 }
@@ -28,9 +29,11 @@ function bc_Bc(input,    Options, opts, o) {
 		send(sprintf(bc_Msg["opt-err"],
 		     $3, "bc => getopt", Options[0]))
 		return
-	}
-
-	if (Options[STDOPT] == "") {
+	} else if (s == GETOPT_BADQUOTE) {
+		send(sprintf(bc_Msg["opt-badquote"],
+		     $3, "bc => getopt", Options[0]))
+		return
+	} else if (Options[STDOPT] == "") {
 		send(sprintf(bc_Msg["opt-no-query"],
 		     $3, "bc => getopt"))
 		return
