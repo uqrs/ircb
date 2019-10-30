@@ -430,7 +430,7 @@ function dbinterface_Query_search(Options,    success, mode, Results, Fields, db
 			return -5
 		}
 	} else {
-		Options[DBOPT_FIELD] = DBF_CONTENTS
+		Options[DBOPT_FIELD] = "contents"
 	}
 
 	if (DBOPT_INVERT in Options)

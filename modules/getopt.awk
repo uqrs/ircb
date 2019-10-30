@@ -67,11 +67,11 @@ function getopt_Getopt(input, accept, Output,    term, i, T, F, o, escaped, copt
 				term = "'"
 
 		} else if (T[i] ~ /^\\*-/) {
-			if (T[i] ~ /^\\*--$/ && !lock) {
+			if (lock || term || carg) {
+				carg = carg T[i]
+			} else if (T[i] ~ /^\\*--$/) {
 				copt = STDOPT
 				lock = 1
-			} else if (lock || term || carg) {
-				carg = carg T[i]
 			} else {
 				if (!(i+1 in T) || T[i+1] ~ /["' ]/) {
 					carg = carg T[i]
