@@ -48,8 +48,8 @@ BEGIN {
 
 	yt_Msg["noquery"] = "PRIVMSG %s :[%s] fatal: must specify a search query."
 	yt_Msg["noresults"] = "PRIVMSG %s :[%s] No results for query '%s'"
-	yt_Msg["result"] = "PRIVMSG %s :[%s] %s\x02 - length:\x0F %s\x02 -\x0F %s\x02 views -\x0F %s↑ %s↓ - uploaded by\x02 %s\x02 -\x0F https://youtu.be/%s"
-	yt_Msg["channel"] = "PRIVMSG %s :[%s] %s\x02 -\x0F %s\x02 videos,\x0F %s\x02 subscribers,\x0F %s views\x02 -\x0F https://youtube.com/%s"
+	yt_Msg["result"] = "PRIVMSG %s :[%s] %s\x02 - length:\x0F %s\x02 -\x0F %s\x02 views -\x0F %s↑ %s↓ - uploaded by\x02 %s\x02 -\x0F https://youtu.be/%s "
+	yt_Msg["channel"] = "PRIVMSG %s :[%s] %s\x02 -\x0F %s\x02 videos,\x0F %s\x02 subscribers,\x0F %s views\x02 -\x0F https://youtube.com/%s "
 }
 
 function yt_comma(s) {
@@ -65,6 +65,8 @@ function yt_search(q, t, n,   apikey, Curl_data, Curl_headers, r, l) {
 
 	if (!t)
 		t = "video"
+	if (!n)
+		n = 1
 
 	Curl_data["part"] = "snippet"
 	Curl_data["order"] = "relevance"

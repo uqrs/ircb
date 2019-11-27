@@ -27,7 +27,7 @@ BEGIN {
 	GOOGLEOPT_VIDEO = "I"
 
 	google_Msg["noquery"] = "PRIVMSG %s :[%s] fatal: must specify a search query."
-	google_Msg["result"] = "PRIVMSG %s :[%s] %s\x02 -\x0F %s\x02 -\x0F %s"
+	google_Msg["result"] = "PRIVMSG %s :[%s] %s \x02-\x0F %s\x02 -\x0F %s"
 	google_Msg["noresults"] = "PRIVMSG %s :[%s] fatal: no results for query '%s'"
 }
 
@@ -92,7 +92,7 @@ function google_Getopt(Options, args,    status) {
 	r = google_Getopt(Options, cut($0, 5))
 
 	if (r == GOOGLEOPT_SEARCH) {
-		r = google_search(Options[STDOPT], 1, "video")
+		r = google_search(Options[STDOPT])
 
 		if (r == GOOGLE_NORESULTS) {
 			send(sprintf(google_Msg["noresults"],
