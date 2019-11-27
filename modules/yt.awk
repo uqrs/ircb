@@ -127,7 +127,12 @@ function yt_channel(id,    apikey, Curl_data, Curl_headers, r, l) {
 function yt_Getopt(Options, args,    status) {
 	status = getopt_Getopt(args, "V,C", Options)
 
-	if (status != GETOPT_SUCCESS) {
+	if (status == GETOPT_BADQUOTE) {
+		send(sprintf(getopt_Msg["badquote"],
+		     $3, "yt => getopt", Options[0]))
+		return status
+
+	} else if (status != GETOPT_SUCCESS) {
 		send(sprintf(getopt_Msg["invalid"],
 		     $3, "yt => getopt", Options[-1]))
 		return status
@@ -153,7 +158,7 @@ function yt_Getopt(Options, args,    status) {
 	}
 }
 
-($2 == "PRIVMSG") && ($4 ~ /^::yt$/) {
+($2 == "PRIVMSG") && ($4 ~ /^::yt?$/) {
 	split("", Options)
 	r = yt_Getopt(Options, cut($0, 5))
 
@@ -161,8 +166,8 @@ function yt_Getopt(Options, args,    status) {
 		r = yt_search(Options[STDOPT], 1, "video")
 
 		if (r == YT_NORESULTS) {
-			send(sprintf("PRIVMSG %s :" yt_Msg["noresults"],
-			     $3, "yt => getopt", Options[STDOPT]))
+			send(sprintf(yt_Msg["noresults"],
+			     $3, "yt => search", Options[STDOPT]))
 		} else {
 			id = sh(sprintf("jq -r '%s' <<<'%s'", san(YT_JQ_ID), san(r)))
 			r = yt_video(id)
@@ -182,8 +187,8 @@ function yt_Getopt(Options, args,    status) {
 		r = yt_search(Options[STDOPT], 1, "channel")
 
 		if (r == YT_NORESULTS) {
-			send(sprintf("PRIVMSG %s :" yt_Msg["noresults"],
-			     $3, Options[STDOPT]))
+			send(sprintf(yt_Msg["noresults"],
+			     $3, "yt => search", Options[STDOPT]))
 		} else {
 			id = sh(sprintf("jq -r '%s' <<<'%s'", san(YT_JQ_CHANNEL_ID), san(r)))
 			r = yt_channel(id)

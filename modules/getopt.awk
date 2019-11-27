@@ -12,6 +12,7 @@ BEGIN {
 	getopt_Msg["invalid"] = "PRIVMSG %s :[%s] fatal: erroneous option: `%s`."
 	getopt_Msg["collision"] = "PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` received."
 	getopt_Msg["neither"] = "PRIVMSG %s :[%s] fatal: one of %s is required."
+	getopt_Msg["badquote"] = "PRIVMSG %s :[%s] fatal: unfinished string (%s)"
 }
 
 function getopt_tokenise(input, T) {
