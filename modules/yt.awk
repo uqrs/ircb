@@ -129,7 +129,7 @@ function yt_Getopt(Options, args,    status) {
 
 	if (status != GETOPT_SUCCESS) {
 		send(sprintf(getopt_Msg["invalid"],
-		     $3,"yt => getopt", Options[-1]))
+		     $3, "yt => getopt", Options[-1]))
 		return status
 	}
 
@@ -162,7 +162,7 @@ function yt_Getopt(Options, args,    status) {
 
 		if (r == YT_NORESULTS) {
 			send(sprintf("PRIVMSG %s :" yt_Msg["noresults"],
-			     $3, Options[STDOPT]))
+			     $3, "yt => getopt", Options[STDOPT]))
 		} else {
 			id = sh(sprintf("jq -r '%s' <<<'%s'", san(YT_JQ_ID), san(r)))
 			r = yt_video(id)
