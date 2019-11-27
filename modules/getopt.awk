@@ -1,13 +1,17 @@
 BEGIN {
 	GETOPT_SUCCESS = 0
-	GETOPT_INVALID = 1
-	GETOPT_BADQUOTE = 2
-	GETOPT_NEITHER = 1
-	GETOPT_COLLISION = 2
-	GETOPT_INCOMPATIBLE = 1
+	GETOPT_INVALID = -1
+	GETOPT_BADQUOTE = -2
+	GETOPT_NEITHER = -3
+	GETOPT_COLLISION = -4
+	GETOPT_INCOMPATIBLE = -5
 
 	STDOPT = "--"
 	GETOPT_EMPTY = ""
+
+	getopt_Msg["invalid"] = "PRIVMSG %s :[%s] fatal: erroneous option: `%s`."
+	getopt_Msg["collision"] = "PRIVMSG %s :[%s] fatal: conflicting options `%s` and `%s` received."
+	getopt_Msg["neither"] = "PRIVMSG %s :[%s] fatal: one of %s is required."
 }
 
 function getopt_tokenise(input, T) {
@@ -126,7 +130,7 @@ function getopt_Either (Options, which,    found, i) {
 		if (i ~ which) {
 			if (found) {
 				Options[0] = found
-				Options[-1] = 1
+				Options[-1] = i
 				return GETOPT_COLLISION
 
 			} else {

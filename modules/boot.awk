@@ -32,7 +32,7 @@ function boot_Send(){
 }
 
 ## some ircds may not use 376 as end-of-motd
-($2 == "376") {
+($2 == "376") || ($2 == "422") {
 	if (boot_Nickserv() == BOOT_NOPASSFILE)
 		boot_Send()
 }
