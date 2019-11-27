@@ -76,6 +76,10 @@ function send(msg) {
 	fflush()
 }
 
+function fsendmsg(c, w, m) {
+	send(sprintf("PRIVMSG %s :[%s] %s", c, w, m))
+}
+
 function sh(syscall,    stdout) {
 	syscall | getline stdout
 	close(syscall)
@@ -87,7 +91,6 @@ function lsh(syscall, Lines,    stdout) {
 		Lines[length(Lines)+1] = stdout
 	}
 	close(syscall)
-	return Lines[1]
 }
 
 function watchdog(s) {
