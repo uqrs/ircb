@@ -5,6 +5,7 @@ BEGIN {
 	GETOPT_NEITHER = -3
 	GETOPT_COLLISION = -4
 	GETOPT_INCOMPATIBLE = -5
+	GETOPT_NOARG = -6
 
 	STDOPT = "--"
 	GETOPT_EMPTY = ""
@@ -28,6 +29,7 @@ function getopt_tokenise(input, T) {
 
 function getopt_Getopt(input, accept, Output,    term, i, T, F, o, escaped, copt, carg, lock, A_tmp, A, a) {
 	split("", Output)
+	split("", T)
 
 	split(accept, A_tmp, ",")
 

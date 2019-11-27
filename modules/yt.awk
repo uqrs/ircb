@@ -7,7 +7,7 @@
 #    -C [q]   query for channels
 BEGIN {
 	# api keyfile
-	yt_apikey = "./cfg/gapikey"
+	yt_apikey = "./cfg/yt_apikey"
 
 	YT_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 	YT_VIDEO_URL = "https://www.googleapis.com/youtube/v3/videos"
@@ -39,6 +39,8 @@ BEGIN {
 	YT_VIDEO = 1
 	YT_CHANNEL = 2
 
+	YT_NORESULTS = -1
+
 	YT_PAGESIZE = 10
 
 	YTOPT_VIDEO = "V"
@@ -54,7 +56,7 @@ function yt_comma(s) {
 	return sh(sprintf("rev <<<'%s' | sed -E 's/(.{3})/\\1,/g; s/,$//' | rev", san(s)))
 }
 
-function yt_search(q, n, t,   apikey, Curl_data, Curl_headers, r, l) {
+function yt_search(q, t, n,   apikey, Curl_data, Curl_headers, r, l) {
 	split("", Curl_data)
 	split("", Curl_headers)
 
@@ -163,7 +165,7 @@ function yt_Getopt(Options, args,    status) {
 	r = yt_Getopt(Options, cut($0, 5))
 
 	if (r == YT_VIDEO) {
-		r = yt_search(Options[STDOPT], 1, "video")
+		r = yt_search(Options[STDOPT], "video", 1)
 
 		if (r == YT_NORESULTS) {
 			send(sprintf(yt_Msg["noresults"],
@@ -184,7 +186,7 @@ function yt_Getopt(Options, args,    status) {
 				$3, "yt => search", V[YTF_TITLE], V[YTF_DURATION], V[YTF_VIEWS], V[YTF_LIKES], V[YTF_DISLIKES], V[YTF_CHANNEL], V[YTF_ID]))
 		}
 	} else if (r == YT_CHANNEL) {
-		r = yt_search(Options[STDOPT], 1, "channel")
+		r = yt_search(Options[STDOPT], "channel", 1)
 
 		if (r == YT_NORESULTS) {
 			send(sprintf(yt_Msg["noresults"],

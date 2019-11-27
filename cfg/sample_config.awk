@@ -49,4 +49,12 @@ BEGIN {
 
 	### dbinterface_color=1;
 
+	#
+	# variables pertaining to
+	#  - google.awk
+	#  - yt.awk
+	#
+	## yt_apikey = "./cfg/yt_apikey"
+	## google_apikey = "./cfg/google_apikey"
+	## google_cx_id = "GOOGLE_SEARCH_ENGINE_ID"
 }
