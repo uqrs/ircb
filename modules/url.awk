@@ -86,34 +86,37 @@ function url_Url(msg,    success, t, L, f, c, i, url, rs, rl)
 	rl = RLENGTH
 
 	while (success != 0) {
+		split("", L)
 		url = substr(msg, rs, rl)
 		url_headers(url, L)
 
-		if (int(L["content-length:"]) > url_maxsize) {
-			send(sprintf(url_Msg["large"],
-			     $3, "url => detect", L["content-type:"], L["content-length:"], url_maxsize))
+		if (length(L) != 0) {
+			if (int(L["content-length:"]) > url_maxsize) {
+				send(sprintf(url_Msg["large"],
+				     $3, "url => detect", L["content-type:"], L["content-length:"], url_maxsize))
 
-		} else if (L["content-type:"] ~ /text\/html/) {
-			t = url_htmltitle(url)
+			} else if (L["content-type:"] ~ /text\/html/) {
+				t = url_htmltitle(url)
 
-			if (t == "") {
-				send(sprintf(url_Msg["notitle"],
-					$3, "url => detect"))
-			} else {
-				send(sprintf(url_Msg["out"],
-					$3, "url => detect", t))
+				if (t == "") {
+					send(sprintf(url_Msg["notitle"],
+						$3, "url => detect"))
+				} else {
+					send(sprintf(url_Msg["out"],
+						$3, "url => detect", t))
 			}
 
-		} else {
-			f = url_tmpdir "ircb-" int(rand()*1000000)
+			} else {
+				f = url_tmpdir "ircb-" int(rand()*1000000)
 
-			i = sh(sprintf("%s %s && file %s",
-			    curl_compose(url), " -L --output " f, f))
+				i = sh(sprintf("%s %s && file %s",
+				    curl_compose(url), " -L --output " f, f))
 
-			send(sprintf(url_Msg["info"],
-			     $3, "url => detect", cut(i,2)))
+				send(sprintf(url_Msg["info"],
+				     $3, "url => detect", cut(i,2)))
 
-			sh(sprintf("rm %s", f))
+				sh(sprintf("rm %s", f))
+			}
 		}
 
 		msg = substr(msg, rs + rl + 1)
